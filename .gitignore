@@ -1,0 +1,7 @@
+# Private working files, never commit
+LAUNCH.md
+parking-lot.md
+gleaner-handoff.md
+yk-seed-data.json
+*.local.*
+.DS_Store
