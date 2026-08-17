@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gleaner, keep what’s yours</title>
+<style>
+:root{--ink:#1d1d1f;--ink2:#6e6e73;--ink3:#aeaeb2;--bg:#ffffff;--panel:#f5f5f7;
+--accent:#0066cc;--gain:#1a7431;--loss:#d70015;--radius:18px;
+--sans:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter','Segoe UI',Helvetica,Arial,sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.47;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding:0 22px}
+button{font-family:var(--sans);cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+nav{position:sticky;top:0;background:rgba(255,255,255,.85);backdrop-filter:blur(20px);border-bottom:1px solid #e8e8ed;z-index:10}
+nav .wrap{display:flex;align-items:center;height:48px;gap:26px}
+.logo{font-weight:600;font-size:1.05rem;letter-spacing:-.02em}
+nav a,nav button.link{font-size:.82rem;color:var(--ink2);text-decoration:none;background:none;border:none}
+nav .spacer{flex:1}
+.pill{background:var(--ink);color:#fff;border:none;border-radius:980px;padding:7px 16px;font-size:.82rem;font-weight:500}
+.pill.blue{background:var(--accent)}
+.pill.ghost{background:var(--panel);color:var(--ink)}
+h1{font-size:clamp(2.2rem,6vw,3.4rem);font-weight:700;letter-spacing:-.025em;line-height:1.08}
+h2{font-size:1.6rem;font-weight:700;letter-spacing:-.02em;margin-bottom:6px}
+h3{font-size:1.02rem;font-weight:600}
+.sub{color:var(--ink2);font-size:1.06rem;max-width:56ch}
+section{padding:54px 0}
+.hero{text-align:center;padding:76px 0 40px}
+.hero .sub{margin:16px auto 28px}
+.hero-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.drop{border:2px dashed #d2d2d7;border-radius:var(--radius);padding:44px 20px;text-align:center;color:var(--ink2);
+transition:all .15s;background:var(--panel);margin-top:34px}
+.drop.over{border-color:var(--accent);background:#eaf3fd}
+.drop b{color:var(--ink);display:block;font-size:1.05rem;margin-bottom:4px}
+.card{background:var(--panel);border-radius:var(--radius);padding:26px;margin-bottom:16px}
+.card.white{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.06),0 8px 30px rgba(0,0,0,.05)}
+.num{font-variant-numeric:tabular-nums}
+.gain{color:var(--gain)}.loss{color:var(--loss)}
+.big{font-size:clamp(2.4rem,7vw,3.6rem);font-weight:700;letter-spacing:-.03em;line-height:1}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.grid3,.grid2{grid-template-columns:1fr}}
+.stat{background:#fff;border-radius:var(--radius);padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.stat .l{font-size:.78rem;color:var(--ink2);margin-bottom:4px}
+.stat .v{font-size:1.5rem;font-weight:700;letter-spacing:-.02em}
+table{width:100%;border-collapse:collapse;font-size:.88rem;background:#fff;border-radius:12px;overflow:hidden}
+th.sort{cursor:pointer;user-select:none}th.sort:hover{color:var(--ink)}
+th{text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink2);font-weight:600;padding:10px 12px;background:#fafafa;white-space:nowrap}
+td{padding:10px 12px;border-top:1px solid #f0f0f2}
+td.r,th.r{text-align:right}
+.sym{font-weight:600;white-space:nowrap;min-width:128px}
+.caret+*,.sym{vertical-align:middle}
+.tag{display:inline-block;font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:20px;background:#e8e8ed;color:var(--ink2);margin-left:6px}
+.tag.warn{background:#fdf3ce;color:#3a3a3c}
+.caret{background:none;border:none;color:var(--ink2);font-size:.85rem;padding:0;margin-right:8px;width:16px;cursor:pointer}
+.caret:hover{color:var(--accent)}
+input[type=checkbox]{width:auto;height:auto;accent-color:var(--accent);vertical-align:-1.5px;margin-right:8px;cursor:pointer}
+tr.lot-row td{background:#fafafa;font-size:.78rem;color:var(--ink2);padding-top:7px;padding-bottom:7px}
+tr.lot-ctl td{background:#fafafa;font-size:.72rem;padding-top:6px;padding-bottom:2px}
+tr.lot-ctl button{background:none;border:none;color:var(--accent);font-size:.72rem;padding:0 4px}
+.plan{background:var(--panel);border-radius:14px;padding:18px 20px;margin-top:16px}
+.plan .rowline{display:flex;justify-content:space-between;font-size:.9rem;padding:5px 0;border-bottom:1px dashed #e8e8ed}
+.plan .rowline:last-child{border-bottom:none}
+.plan .big-save{font-size:1.35rem;font-weight:700;letter-spacing:-.02em}
+.tag.ok{background:#e4f3e8;color:var(--gain)}
+.tag.info{background:#e8f2fd;color:#3a3a3c}
+label{display:block;font-size:.8rem;font-weight:600;margin:14px 0 5px}
+input,select{width:100%;padding:10px 12px;border:1px solid #d2d2d7;border-radius:10px;font-family:var(--sans);font-size:.92rem;background:#fff}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+select{appearance:none;-webkit-appearance:none;padding-right:36px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236e6e73' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.row{display:flex;gap:12px}.row>*{flex:1}
+.hint{font-size:.78rem;color:var(--ink2);margin-top:5px}
+.acct{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-top:1px solid #e8e8ed;font-size:.92rem}
+.acct:first-of-type{border-top:none}
+.x{background:none;border:none;color:var(--ink2);font-size:1rem;padding:4px 8px}
+.x:hover{color:var(--loss)}
+dialog{margin:auto;border:none;border-radius:var(--radius);padding:28px;max-width:560px;width:94%;box-shadow:0 24px 80px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(0,0,0,.4);backdrop-filter:blur(4px)}
+.d-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+.tip{display:inline-block;background:none;border:none;box-shadow:none;color:inherit;font-size:.8rem;line-height:1;cursor:help;position:relative;vertical-align:0;margin-left:5px}
+.tip::after{content:attr(data-tip);position:absolute;left:-8px;bottom:135%;background:var(--ink);color:#fff;padding:9px 12px;border-radius:9px;font-size:.75rem;font-weight:400;line-height:1.5;width:250px;text-align:left;opacity:0;pointer-events:none;transition:opacity .12s;z-index:30}
+.tip:hover::after,.tip:focus::after{opacity:1}
+details.card summary{cursor:pointer;font-size:.98rem;font-weight:600}
+details.card summary .hint{font-weight:400;margin-left:8px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 22px;border-radius:980px;font-size:.88rem;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99;max-width:92%}
+.toast.show{opacity:1}
+.foot{padding:34px 0 50px;font-size:.75rem;color:var(--ink2);text-align:center;line-height:1.7}
+.disclaim{background:#fff8e6;border-radius:12px;padding:14px 18px;font-size:.8rem;color:#7a5c00;margin:18px 0}
+.maperr{background:#fdeaea;color:#a01a1a;border-radius:8px;padding:10px 12px;font-size:.82rem;margin:10px 0}
+.mapper-prev{max-height:150px;overflow:auto;font-size:.72rem;background:var(--panel);border-radius:10px;padding:10px;margin-top:12px;font-family:monospace;white-space:pre}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+ <a href="index.html" style="font-size:.85rem;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;padding:6px 0" aria-label="Gleaner home"><span style="font-weight:600;color:var(--ink)">Gleaner</span><span style="color:var(--ink2)"> · Keep what’s yours</span></a>
+ <span class="spacer"></span>
+ <button class="link" onclick="demo()">Demo</button>
+ <button class="link" onclick="wipe()">Erase my data</button>
+ <a href="https://ko-fi.com/tinastools" target="_blank" rel="noopener" class="pill ghost" style="text-decoration:none">☕ Tip jar</a>
+</div></nav>
+
+<div class="wrap">
+<section class="hero" id="hero">
+ <h1>Find the tax losses<br>hiding in your accounts.</h1>
+ <p class="sub">Drop in the CSV files you download from your own brokerages. Gleaner shows every underwater position, what selling would offset, and what to watch out for. Nothing you import ever leaves this browser.</p>
+ <div class="hero-actions">
+  <button class="pill blue" onclick="document.getElementById('file').click()">Import a brokerage CSV</button>
+  <button class="pill ghost" onclick="demo()">Try the demo</button>
+ </div>
+ <div class="drop" id="drop"><b>Drag CSV files here</b>Schwab · Fidelity · E*TRADE · Vanguard · SoFi · J.P. Morgan, or map most other CSVs yourself<br><span style="font-size:.82rem;color:var(--ink2)">🔒 Your files stay on your computer. Nothing is ever uploaded</span><br><button class="link" style="background:none;border:none;color:var(--accent);font-size:.82rem;margin-top:40px" onclick="whichFile()">Which file do I download from my brokerage?</button></div>
+</section>
+
+<section id="dash" hidden>
+ <div class="grid3" id="stats"></div>
+ <div class="toolbar" style="margin-top:16px;margin-bottom:0">
+  <button class="pill" onclick="document.getElementById('file').click()">Import another CSV</button>
+  <button class="pill ghost" onclick="exportReport()">Download report (CSV)</button>
+  <button class="pill ghost" onclick="remindMe()">🗓 Remind me before year-end</button>
+ </div>
+ <details class="card" id="acctBox" style="padding:16px 22px;margin-top:16px">
+  <summary>Accounts<span class="hint" id="acctSum"></span></summary>
+  <div id="accts" style="margin-top:8px"></div>
+ </details>
+ <div class="card white" style="margin-top:16px">
+  <h2>Harvest report</h2>
+  <p class="sub" style="font-size:.9rem">Positions currently worth less than you paid, ranked by loss. Selling realizes the loss for your tax return.</p>
+  <div class="row" style="margin:14px 0 6px;max-width:860px">
+   <div><label>Gains you've already realized this year ($)<span class="tip" tabindex="0" data-tip="Realized means you actually sold. Profits still sitting in investments don’t count yet. Type your total here, or drop your brokerage's realized gain/loss CSV onto the page and this fills itself. E*TRADE and Schwab formats are read automatically.">ⓘ</span></label><input id="ytd" type="number" placeholder="0" onchange="S.ytd=+this.value||0;save()"></div>
+   <div><label>Federal rate on long-term gains<span class="tip" tabindex="0" data-tip="Not your income tax bracket. Long term capital gains (held over a year) have their own lower schedule: 0%, 15%, or 20% depending on household income, plus an extra 3.8% on investment income once household income passes ~$250K married or ~$200K single. The IRS calls that the net investment income tax, or NIIT. Pick the tier matching your total household income.">ⓘ</span></label><select id="fed" onchange="S.fed=+this.value;recalcRate()">
+    <option value="0">0% for income under ~$97K married or ~$48K single</option>
+    <option value="0.15">15% for income up to ~$250K</option>
+    <option value="0.188">18.8% for income ~$250K to $600K (15% plus 3.8% investment tax)</option>
+    <option value="0.238">23.8% for income above ~$600K (20% plus 3.8% investment tax)</option></select></div>
+  </div>
+  <div class="row" style="margin:0 0 6px;max-width:860px">
+   <div><label>State</label><select id="state" onchange="pickState(this.value)"></select></div>
+   <div><label>State rate on gains (%)<span class="tip" tabindex="0" data-tip="An approximate default for your state. Most states tax capital gains as regular income, and real rates vary with your income and year. If you or your CPA know your actual marginal rate, type it over the default.">ⓘ</span></label><input id="srate" type="number" step="0.1" min="0" max="15" onchange="S.stateRate=+this.value||0;recalcRate()"></div>
+  </div>
+  <div class="hint" id="combo" style="margin-bottom:4px"></div>
+  <div id="report"></div>
+  <div class="disclaim">Gleaner is an educational calculator, not investment, tax, or legal advice. It shows math on data you provide; decisions and their consequences are yours. Confirm anything you plan to act on with a qualified tax professional.</div>
+ </div>
+
+</section>
+</div>
+<div class="foot wrap">Your data lives only in this browser, so clearing your site data erases it.<br>
+Educational tool for US tax rules · Not investment or tax advice · No accounts, no tracking, no server · <a href="index.html" style="color:var(--ink2)">About</a><br>
+<span style="display:inline-block;margin-top:10px">&copy; 2026 Gleaner app · <a href="https://github.com/tyuan8/gleaner-tool" style="color:inherit">Read the code</a></span></div>
+<dialog id="dlg"></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<input type="file" id="file" accept=".csv" multiple hidden>
+<script>
+/* ---------- state ---------- */
+const KEY='gleaner-v1';
+let S=(()=>{try{const d=JSON.parse(localStorage.getItem(KEY));return d&&d.accounts?d:null}catch(e){return null}})()||{accounts:[],ytd:0,rate:0.24,demo:false};S.plan=S.plan||{};
+const $=q=>document.querySelector(q);
+const save=()=>{localStorage.setItem(KEY,JSON.stringify(S));render()};
+const fmt=n=>(n<0?'−':'')+'$'+Math.abs(n).toLocaleString('en-US',{maximumFractionDigits:0});
+const fmtP=n=>n<0?'($'+Math.abs(n).toLocaleString('en-US',{maximumFractionDigits:0})+')':'$'+Math.abs(n).toLocaleString('en-US',{maximumFractionDigits:0});
+const today=()=>new Date().toISOString().slice(0,10);
+const fmtD=iso=>{const d=new Date(iso);return isNaN(d)?iso:d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})};
+const fmt2=n=>'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),3000)}
+const num=s=>{if(s==null)return null;const t=String(s).replace(/[$,"%()]/g,'').replace(/−|--/g,'-').trim();if(t===''||t==='-')return null;const v=parseFloat(t);return isNaN(v)?null:v};
+function splitLine(l){const o=[];let c='',q=false;for(const ch of l){if(ch==='"')q=!q;else if(ch===','&&!q){o.push(c);c=''}else c+=ch}o.push(c);return o}
+
+/* ---------- import pipeline ---------- */
+$('#file').addEventListener('change',e=>{[...e.target.files].forEach(handleFile);e.target.value=''});
+const drop=$('#drop');
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',e=>[...e.dataTransfer.files].forEach(handleFile));
+async function handleFile(f){
+  if(!/\.csv$/i.test(f.name)){toast(f.name+' isn’t a CSV');return}
+  const text=await f.text();
+  const parsed=detect(text);
+  if(parsed&&parsed.kind==='realized'){
+    S.realized=S.realized||{};
+    const prev=S.realized[f.name]||0;
+    S.ytd=Math.round(((S.ytd||0)-prev+parsed.total)*100)/100;
+    S.realized[f.name]=parsed.total;S.demo=false;save();
+    toast(`${parsed.source}: ${fmt(parsed.total)} realized, added to the gains field`);return}
+  if(parsed){finishImport(parsed.name,parsed.rows,f.name)}
+  else openMapper(text,f.name);
+}
+function finishImport(brokerName,rows,fname){
+  rows=rows.filter(r=>r.symbol&&r.qty>0);
+  if(!rows.length){
+    openDlg(`<h2 style="font-size:1.3rem">Nothing to import</h2>
+     <p class="hint" style="margin-top:8px">Gleaner recognized <b>${fname}</b> as a ${brokerName} file, but it didn’t contain any holdings. If you exported an empty date range or a filtered view, download it again from your brokerage and try once more.</p>`,()=>{},'Got it');
+    return}
+  const name=brokerName+' · '+fname.replace(/\.csv$/i,'').slice(0,24);
+  S.demo=false;
+  S.accounts=S.accounts.filter(a=>a.name!==name);
+  S.accounts.push({name,rows});
+  save();toast(`Imported ${rows.length} positions from ${brokerName}`);
+}
+
+/* ---------- brokerage auto-detection ---------- */
+function detect(text){
+  const L=text.split(/\r?\n/);
+  // Realized gain/loss exports → fill the YTD gains field instead of importing positions
+  if(/Realized Gain\/Loss/i.test(L[0]||'')){ // Schwab
+    const hi=L.findIndex(l=>/"?Symbol"?/.test(l)&&/Gain\/Loss/.test(l));
+    if(hi>=0){const h=splitLine(L[hi]).map(x=>x.trim().replace(/^"|"$/g,''));
+      const gi=h.findIndex(x=>x.toLowerCase()==='gain/loss ($)');
+      if(gi>=0){let t=0,n=0;
+        for(const l of L.slice(hi+1)){const c=splitLine(l).map(x=>x.replace(/^"|"$/g,''));
+          const v=num(c[gi]);if(c[0]&&v!=null){t+=v;n++}}
+        if(n)return {kind:'realized',total:t,source:'Schwab realized gain/loss'};}}}
+  if(/Record Type/.test(L[0]||'')&&/Date Sold/.test(L[0]||'')){ // E*TRADE Gains & Losses
+    const h=splitLine(L[0]).map(x=>x.trim());
+    const gi=h.findIndex(x=>/adjusted gain\/loss$/i.test(x)||(/adjusted gain/i.test(x)&&!/per share/i.test(x)));
+    if(gi>=0){let t=0,n=0;
+      for(const l of L.slice(1)){const c=splitLine(l);
+        if(c[0]!=='Sell')continue;const v=num(c[gi]);if(v!=null){t+=v;n++}}
+      if(n)return {kind:'realized',total:t,source:'E*TRADE gains & losses'};}}
+  // SoFi, one header for both exports; SELL rows mean it's a realized file
+  if(/Buy\/Sell/i.test(L[0]||'')&&/Disallowed Loss/i.test(L[0]||'')){
+    const h=splitLine(L[0]).map(x=>x.trim());
+    const ix=n=>h.findIndex(x=>new RegExp('^'+n+'$','i').test(x));
+    const bs=ix('buy/sell'),si=ix('symbol'),di=ix('description'),td=ix('trade date'),
+          up=ix('unit price'),qi=ix('quantity'),tc=ix('total cost'),
+          st=ix('short term gain/loss'),lt=ix('long term gain/loss');
+    const body=L.slice(1).map(l=>splitLine(l).map(x=>x.trim())).filter(c=>c[bs]);
+    const sells=body.filter(c=>/sell/i.test(c[bs]));
+    if(sells.length){
+      let t=0;
+      sells.forEach(c=>{t+=(num(c[st])||0)+(num(c[lt])||0)});
+      return {kind:'realized',total:t,source:'SoFi realized gains'};
+    }
+    const bySym={};
+    body.filter(c=>/buy/i.test(c[bs])).forEach(c=>{
+      const sym=c[si];if(!sym)return;
+      const qty=num(c[qi]);if(qty==null||qty<=0)return;
+      const cost=num(c[tc]); const unit=num(c[up]);
+      const basis=unit!=null?unit:(cost!=null?cost/qty:null);
+      if(basis==null)return;
+      const stv=num(c[st]),ltv=num(c[lt]);
+      const gl=(stv||0)+(ltv||0);
+      let term='';
+      if(ltv!=null&&ltv!==0)term='LT'; else if(stv!=null&&stv!==0)term='ST';
+      else {const d=new Date(c[td]); if(!isNaN(d))term=(Date.now()-d.getTime())/86400000>365?'LT':'ST';}
+      const p=bySym[sym]=bySym[sym]||{symbol:sym,desc:c[di]||'',qty:0,price:0,_mv:0,basisTotal:0,lots:[]};
+      const lotCost=cost!=null?cost:basis*qty;
+      p.qty+=qty; p.basisTotal+=lotCost; p._mv+=lotCost+gl;
+      p.lots.push({qty,basis,acquired:c[td]||'',term});
+    });
+    const rows=Object.values(bySym).map(p=>{p.price=p.qty?p._mv/p.qty:0;delete p._mv;return p});
+    return {name:'SoFi',rows};
+  }
+  // Vanguard realized capital gains, summary (by symbol) or detail (by lot)
+  if(/Total capital gain\/loss/i.test(text)&&/Short term capital gain\/loss/i.test(text)&&!/Symbol\/CUSIP/i.test(text)){
+    const hi=L.findIndex(l=>/Total capital gain\/loss/i.test(l));
+    if(hi>=0){const h=splitLine(L[hi]).map(x=>x.trim());
+      const gi=h.findIndex(x=>/^total capital gain\/loss$/i.test(x));
+      const isDetail=h.some(x=>/^date sold$/i.test(x));
+      if(gi>=0){let t=0,n=0;
+        for(const l of L.slice(hi+1)){const c=splitLine(l).map(x=>x.trim());
+          if(!c[0]||/^total/i.test(c[0]))continue;
+          const v=num(c[gi]);if(v!=null){t+=v;n++}}
+        return {kind:'realized',total:t,source:'Vanguard realized gains ('+(isDetail?'detail':'summary')+')'};}}}
+  // Vanguard unrealized cost basis, one row per LOT, with acquired date and ST/LT split
+  if(/Symbol\/CUSIP/i.test(text)&&/Cost per share/i.test(text)&&/Acquired date/i.test(text)){
+    const hi=L.findIndex(l=>/Symbol\/CUSIP/i.test(l)&&/Cost per share/i.test(l));
+    if(hi>=0){
+      const h=splitLine(L[hi]).map(x=>x.trim());
+      const ix=n=>h.findIndex(x=>new RegExp('^'+n,'i').test(x));
+      const si=ix('symbol/cusip'),di=ix('description'),ai=ix('acquired date'),qi=ix('quantity'),
+            ci=ix('cost per share'),tci=ix('total cost'),mi=ix('market value'),sti=ix('short term gain'),lti=ix('long term gain');
+      const bySym={};
+      for(const l of L.slice(hi+1)){
+        const c=splitLine(l).map(x=>x.trim());
+        const sym=c[si];if(!sym||/^total/i.test(sym))continue;
+        const qty=num(c[qi]);if(qty==null||qty<=0)continue;
+        const cps=num(c[ci]); const tc=num(c[tci]);
+        const basis=cps!=null?cps:(tc!=null?tc/qty:null);
+        if(basis==null)continue;
+        const mv=num(c[mi]);
+        const stv=sti>=0?num(c[sti]):null, ltv=lti>=0?num(c[lti]):null;
+        let term='';
+        if(ltv!=null&&ltv!==0)term='LT'; else if(stv!=null&&stv!==0)term='ST';
+        else {const d=new Date(c[ai]); if(!isNaN(d))term=(Date.now()-d.getTime())/86400000>365?'LT':'ST';}
+        const p=bySym[sym]=bySym[sym]||{symbol:sym,desc:c[di]||'',qty:0,price:0,_mv:0,basisTotal:0,lots:[]};
+        p.qty+=qty; p._mv+=(mv||qty*basis); p.basisTotal+=(tc!=null?tc:basis*qty);
+        p.lots.push({qty,basis,acquired:c[ai]||'',term});
+      }
+      const rows=Object.values(bySym).map(p=>{p.price=p.qty?p._mv/p.qty:0;delete p._mv;return p});
+      return {name:'Vanguard cost basis',rows};
+    }
+  }
+  // E*TRADE stock plan, RSU benefit export (one row per sellable lot)
+  if(/Record Type/.test(L[0]||'')&&/Sellable Qty\./.test(L[0]||'')&&/Sellable Shares/.test(text)){
+    let fileSym='';for(const l of L.slice(1)){const c=splitLine(l);if(c[1]&&c[1].trim()){fileSym=c[1].trim();break}}
+    const bySym={};
+    for(const l of L.slice(1)){const c=splitLine(l).map(x=>x.trim());
+      if(c[0]!=='Sellable Shares')continue;
+      const sym=c[1]||fileSym||'STOCK';const qty=num(c[32]);const mv=num(c[34]);const basis=num(c[35]);
+      if(qty==null||qty<=0||basis==null)continue;
+      const p=bySym[sym]=bySym[sym]||{symbol:sym,desc:'RSU lots (stock plan)',qty:0,price:0,_mv:0,basisTotal:0,lots:[]};
+      p.qty+=qty;p._mv+=(mv||0);p.basisTotal+=qty*basis;
+      p.lots.push({qty,basis,acquired:c[61]||'',term:/long/i.test(c[37]||'')?'LT':'ST'});}
+    const rows=Object.values(bySym).map(p=>{p.price=p.qty?p._mv/p.qty:0;delete p._mv;return p});
+    return {name:'E*TRADE Stock Plan (RSU)',rows};}
+  // E*TRADE stock plan, ESPP export
+  if(/Record Type/.test(L[0]||'')&&/Purchase Date FMV/.test(L[0]||'')){
+    let fileSym='';for(const l of L.slice(1)){const c=splitLine(l);if(c[1]&&c[1].trim()){fileSym=c[1].trim();break}}
+    const bySym={};const now=Date.now();
+    for(const l of L.slice(1)){const c=splitLine(l).map(x=>x.trim());
+      if(c[0]!=='Purchase')continue;
+      const sym=c[1]||fileSym||'STOCK';const qty=num(c[7])!=null&&num(c[7])>0?num(c[7]):num(c[4]);
+      const mv=num(c[9]);const basis=num(c[18]);
+      if(qty==null||qty<=0||basis==null)continue;
+      const d=new Date((c[2]||'').replace(/-/g,' '));
+      const p=bySym[sym]=bySym[sym]||{symbol:sym,desc:'ESPP lots (stock plan)',qty:0,price:0,_mv:0,basisTotal:0,lots:[]};
+      p.qty+=qty;p._mv+=(mv||0);p.basisTotal+=qty*basis;
+      const gd=new Date((c[10]||'').replace(/-/g,' '));
+      let qd='';
+      if(!isNaN(d)&&!isNaN(gd)){const q1=new Date(gd);q1.setFullYear(q1.getFullYear()+2);
+        const q2=new Date(d);q2.setFullYear(q2.getFullYear()+1);
+        qd=(q1>q2?q1:q2).toISOString().slice(0,10);}
+      p.lots.push({qty,basis,acquired:c[2]||'',term:!isNaN(d)&&(now-d.getTime())/86400000>365?'LT':'ST',...(qd?{qualifyDate:qd}:{})});}
+    const rows=Object.values(bySym).map(p=>{p.price=p.qty?p._mv/p.qty:0;delete p._mv;return p});
+    return {name:'E*TRADE Stock Plan (ESPP)',rows};}
+  // Charles Schwab positions export
+  if(/Positions for account|"Symbol","Description"/.test(text)){
+    const hi=L.findIndex(l=>/^"?Symbol"?,/.test(l));
+    if(hi<0)return null;
+    const rows=[];
+    for(const l of L.slice(hi+1)){const c=splitLine(l).map(x=>x.trim());
+      if(!c[0]||/Positions Total|Account Total|Cash & Cash/.test(c[0]))continue;
+      const qty=num(c[2]);if(qty==null)continue;
+      rows.push({symbol:c[0],desc:c[1],qty,price:num(c[3])||0,basisTotal:num(c[9])||null});}
+    return {name:'Schwab',rows};}
+  // E*TRADE portfolio download
+  if(/^Symbol,Last Price \$/m.test(text)){
+    const hi=L.findIndex(l=>l.startsWith('Symbol,Last Price'));
+    const rows=[];
+    for(const l of L.slice(hi+1)){const c=splitLine(l).map(x=>x.trim());
+      if(!c[0]||c[0]==='CASH')continue; if(c[0]==='TOTAL')break;
+      const qty=num(c[4]);if(qty==null)continue;
+      const pps=num(c[5]);
+      rows.push({symbol:c[0],qty,price:num(c[1])||0,basisTotal:pps!=null?pps*qty:null});}
+    return {name:'E*TRADE',rows};}
+  // J.P. Morgan tax-lots export, one row per LOT, includes acquisition date and tax term
+  if(/Tax term/.test(text)&&/Acquisition Date/.test(text)&&/Ticker/.test(text)){
+    const hi=L.findIndex(l=>/Ticker/.test(l)&&/Tax term/.test(l));
+    if(hi>=0){
+      const h=splitLine(L[hi]).map(x=>x.trim());
+      const ix=n=>h.findIndex(x=>x.toLowerCase()===n)>=0?h.findIndex(x=>x.toLowerCase()===n):h.findIndex(x=>x.toLowerCase().includes(n));
+      const ti=ix('ticker'),di=ix('description'),qi=ix('quantity'),pi=ix('price'),ci=ix('cost'),ui=ix('unit cost'),ai=ix('acquisition date'),tmi=ix('tax term'),aci=ix('asset class');
+      const bySym={};
+      for(const l of L.slice(hi+1)){
+        const c=splitLine(l).map(x=>x.trim());
+        const sym=c[ti];if(!sym)continue;
+        if(/cash|money market/i.test(c[aci]||''))continue;
+        const qty=num(c[qi]);if(qty==null||qty<=0)continue;
+        const cost=num(c[ci]); const unit=num(c[ui]);
+        const lotBasis=unit!=null?unit:(cost!=null?cost/qty:null);
+        const p=bySym[sym]=bySym[sym]||{symbol:sym,desc:c[di]||'',qty:0,price:num(c[pi])||0,basisTotal:0,lots:[]};
+        p.qty+=qty; p.basisTotal+=(cost!=null?cost:(lotBasis!=null?lotBasis*qty:0));
+        p.lots.push({qty,basis:lotBasis,acquired:(c[ai]||'').split(' ')[0],term:/long/i.test(c[tmi]||'')?'LT':'ST'});
+      }
+      const rows=Object.values(bySym);
+      return {name:'J.P. Morgan',rows};
+    }
+  }
+  // Fidelity positions export (real files use sentence case: "Account number,…,Cost basis total")
+  if(/account number,account name,symbol,description/i.test(text)||/cost basis total/i.test(L[0]||'')){
+    const hi=L.findIndex(l=>/Symbol/.test(l)&&/Quantity/.test(l));
+    if(hi<0)return null;
+    const h=splitLine(L[hi]).map(x=>x.trim());
+    const ix=n=>h.findIndex(x=>x.toLowerCase().includes(n));
+    const si=ix('symbol'),qi=ix('quantity'),pi=ix('last price'),bi=ix('cost basis total'),di=ix('description');
+    const rows=[];
+    for(const l of L.slice(hi+1)){const c=splitLine(l).map(x=>x.trim());
+      const sym=(c[si]||'').replace(/\*+$/,'');
+      if(!sym||/pending|total|spaxx|fdrxx|cash/i.test(sym))continue;
+      const qty=num(c[qi]);if(qty==null)continue;
+      rows.push({symbol:sym,desc:c[di]||'',qty,price:num(c[pi])||0,basisTotal:num(c[bi])});}
+    return {name:'Fidelity',rows};}
+  // Vanguard holdings download
+  if(/Investment Name,Symbol,Shares/.test(text)||/Fund Account Number/.test(text)){
+    const hi=L.findIndex(l=>/Symbol/.test(l)&&/Shares/.test(l));
+    if(hi<0)return null;
+    const h=splitLine(L[hi]).map(x=>x.trim());
+    const ix=n=>h.findIndex(x=>x.toLowerCase().includes(n));
+    const si=ix('symbol'),qi=ix('shares'),pi=ix('share price'),vi=ix('total value'),di=ix('investment name');
+    const rows=[];
+    for(const l of L.slice(hi+1)){const c=splitLine(l).map(x=>x.trim());
+      if(/trade date|transaction type/i.test(l))break;   // second section of the file starts here
+      if(!c[si])continue;const qty=num(c[qi]);if(qty==null||qty<=0)continue;
+      rows.push({symbol:c[si],desc:c[di]||'',qty,price:num(c[pi])||0,basisTotal:null});}
+    return {name:'Vanguard',rows};}
+  return null; // → column mapper
+}
+
+/* ---------- column mapper (any CSV) ---------- */
+function mapErr(msg){const e=document.getElementById('mapErr');if(!e){toast(msg);return}e.textContent=msg;e.hidden=false;e.scrollIntoView({block:'nearest'})}
+function openMapper(text,fname){
+  const L=text.split(/\r?\n/).filter(l=>l.trim());
+  // guess header: first line whose cells are mostly non-numeric and >=3 cols
+  let hi=L.findIndex(l=>{const c=splitLine(l);return c.length>=3&&c.filter(x=>num(x)==null&&x.trim()).length>=3});
+  if(hi<0)hi=0;
+  const head=splitLine(L[hi]).map(x=>x.trim()||'(blank)');
+  const opts=sel=>'<option value="-1">None</option>'+head.map((h,i)=>`<option value="${i}" ${i===sel?'selected':''}>${h}</option>`).join('');
+  const guess=names=>head.findIndex(h=>names.some(n=>h.toLowerCase().includes(n)));
+  const looksRealized=/date sold|closed date|sale date|proceeds|transaction type|activity type/i.test(L[hi]||'');
+  const looksRetirement=/401\(?k\)?|netbenefits|retirement plan|plan name|contributions/i.test(text.slice(0,600))&&!/cost basis/i.test(text.slice(0,600));
+  openDlg(`<h2 style="font-size:1.3rem">Map the columns</h2>
+   <div id="mapErr" class="maperr" hidden></div>
+   ${looksRetirement?'<p class="hint" style="color:var(--loss)">⚠️ This looks like a retirement account file (401(k), 403(b), or IRA). Losses inside retirement accounts can\'t be harvested at all, so this data won\'t help. If your employer stock plan is at the same provider, look for the stock plan or equity awards section instead of the retirement plan.</p>':looksRealized?'<p class="hint" style="color:var(--loss)">⚠️ This looks like a transaction or activity history, not current holdings. Importing it as positions will create ghosts in your report. E*TRADE and Schwab realized gain files fill the gains field automatically. For other history files, cancel and type your realized gains instead.</p>':''}
+   <p class="hint">Gleaner didn’t recognize this format. Tell it which column is which. Only Symbol and Quantity are required.</p>
+   <div class="row"><div><label>Symbol *</label><select id="m0">${opts(guess(['symbol','ticker']))}</select></div>
+   <div><label>Quantity *</label><select id="m1">${opts(guess(['quantity','qty','shares']))}</select></div></div>
+   <div class="row"><div><label>Current price</label><select id="m2">${opts(guess(['last price','price','share price']))}</select></div>
+   <div><label>Cost basis</label><select id="m3">${opts(guess(['cost basis total','cost basis','total cost','basis']))}</select></div></div>
+   <div class="row"><div><label>Basis is…</label><select id="m4"><option value="total">Total $ for position</option><option value="per">Per share</option></select></div>
+   <div><label>Acquired date <span style="font-weight:400;color:var(--ink2)">(optional)</span></label><select id="m5">${opts(guess(['acquired','purchase date','open date','date acquired']))}</select></div></div>
+   <div class="mapper-prev">${L.slice(hi,hi+5).join('\n').replace(/</g,'&lt;')}</div>`,
+  ()=>{const gi=id=>+document.getElementById(id).value;
+    const si=gi('m0'),qi=gi('m1'),pi=gi('m2'),bi=gi('m3'),per=document.getElementById('m4').value==='per',ai=gi('m5');
+    if(si<0||qi<0){mapErr('Choose a column for both Symbol and Quantity before importing.');return false}
+    const rows=[];
+    for(const l of L.slice(hi+1)){const c=splitLine(l).map(x=>x.trim());
+      if(!c[si])continue;const qty=num(c[qi]);if(qty==null||qty<=0)continue;
+      let basis=bi>=0?num(c[bi]):null; if(basis!=null&&per)basis*=qty;
+      rows.push({symbol:c[si].toUpperCase(),qty,price:pi>=0?(num(c[pi])||0):0,basisTotal:basis,acquired:ai>=0?c[ai]:null});}
+    finishImport('Custom',rows,fname);},'Import');
+}
+/* ---------- harvest engine ---------- */
+function allRows(){return S.accounts.flatMap(a=>a.rows.map(r=>({...r,acct:a.name})))}
+function analyze(){
+  const rows=allRows();
+  const withBasis=rows.filter(r=>r.basisTotal!=null&&r.price>0);
+  const losers=withBasis.map(r=>{
+    if(r.lots&&r.lots.length&&r.lots.every(l=>l.basis!=null)){
+      const lossLots=r.lots.filter(l=>l.qty*(r.price-l.basis)<0);
+      const gl=lossLots.reduce((s,l)=>s+l.qty*(r.price-l.basis),0);
+      const st=lossLots.filter(l=>l.term==='ST').reduce((s,l)=>s+l.qty*(r.price-l.basis),0);
+      return {...r,val:lossLots.reduce((s,l)=>s+l.qty*r.price,0),
+        basisTotal:lossLots.reduce((s,l)=>s+l.qty*l.basis,0),gl,
+        lotInfo:{n:lossLots.length,total:r.lots.length,st,lt:gl-st}};
+    }
+    return {...r,val:r.qty*r.price,gl:r.qty*r.price-r.basisTotal};
+  }).filter(r=>r.gl<-1).sort((a,b)=>a.gl-b.gl);
+  const totalLoss=losers.reduce((s,r)=>s+r.gl,0);
+  // cross-account wash-sale exposure: losing symbol also held in another account
+  const held={};rows.forEach(r=>{(held[r.symbol]=held[r.symbol]||new Set()).add(r.acct)});
+  losers.forEach(r=>r.multiAcct=held[r.symbol].size>1);
+  const noBasis=rows.filter(r=>r.basisTotal==null);
+  const totalVal=rows.reduce((s,r)=>s+r.qty*(r.price||0),0);
+  return {losers,totalLoss,noBasis,totalVal,count:rows.length};
+}
+function render(){
+  const has=S.accounts.length>0||!!(S.realized&&Object.keys(S.realized).length);
+  $('#hero').hidden=has; $('#dash').hidden=!has;
+  if(!has)return;
+  $('#ytd').value=S.ytd||'';
+  $('#fed').value=String(S.fed);
+  $('#state').innerHTML=STATES.map(s=>`<option value="${s[0]}" ${S.state===s[0]?'selected':''}>${s[1]}${s[2]!=null&&s[0]?' ~'+s[2]+'%':''}</option>`).join('');
+  $('#srate').value=S.stateRate!=null?S.stateRate:'';
+  $('#combo').textContent=`Combined rate used in estimates: ${(S.rate*100).toFixed(1)}% (federal ${(S.fed*100).toFixed(1)}% + state ${(S.stateRate||0).toFixed(1)}%)`;
+  if(!S.accounts.length){
+    $('#stats').innerHTML='';
+    $('#report').innerHTML=`<div class="empty" style="padding:24px 10px"><b>Sales recorded, holdings still needed.</b>
+      Gleaner has your realized gains of ${fmt(S.ytd||0)}. To find losses you can harvest, import a positions or cost basis file showing what you still own.
+      <div style="margin-top:16px"><button class="pill" onclick="document.getElementById('file').click()">Import a positions CSV</button></div></div>`;
+    $('#accts').innerHTML='';$('#acctSum').textContent='';
+    $('#ytd').value=S.ytd||'';$('#fed').value=String(S.fed);
+    $('#state').innerHTML=STATES.map(s=>`<option value="${s[0]}" ${S.state===s[0]?'selected':''}>${s[1]}${s[2]!=null&&s[0]?' ~'+s[2]+'%':''}</option>`).join('');
+    $('#srate').value=S.stateRate!=null?S.stateRate:'';
+    $('#combo').textContent=`Combined rate used in estimates: ${(S.rate*100).toFixed(1)}% (federal ${(S.fed*100).toFixed(1)}% + state ${(S.stateRate||0).toFixed(1)}%)`;
+    return;
+  }
+  const A=analyze();
+  const offset=Math.min(Math.abs(A.totalLoss),S.ytd||0);
+  const surplus=Math.abs(A.totalLoss)-offset;
+  const saved=offset*S.rate+Math.min(surplus,3000)*(S.rate+0.10);
+  $('#stats').innerHTML=`
+   <div class="stat"><div class="l">Portfolio imported</div><div class="v num">${fmt(A.totalVal)}</div><div class="hint">${A.count} positions · ${S.accounts.length} account${S.accounts.length>1?'s':''}</div></div>
+   <div class="stat"><div class="l">Harvestable losses<span class="tip" tabindex="0" data-tip="Positions currently worth less than you paid. The loss is only on paper until you sell. Selling turns it into a tax deduction, and that’s the harvest.">ⓘ</span></div><div class="v num loss">${fmtP(A.totalLoss)}</div><div class="hint">${A.losers.length} underwater positions</div></div>
+   <div class="stat"><div class="l">Estimated tax savings if harvested</div><div class="v num gain">≈ ${fmt(saved)}</div><div class="hint">offsets ${fmt(offset)} of gains${surplus>0?' + '+fmt(Math.min(surplus,3000))+' vs income; '+fmt(Math.max(surplus-3000,0))+' carries forward':''}</div></div>`;
+  const arrow=c=>sortCol===c?(sortDir===1?' ▲':' ▼'):'';
+  const sorted=[...A.losers].sort((x,y)=>{
+    const v=k=>k==='symbol'||k==='acct'?String(x[k]).localeCompare(String(y[k])):x[k]-y[k];
+    return v(sortCol)*sortDir||x.gl-y.gl;});
+  const P=planImpact();
+  let planHtml='';
+  if(P.cnt>0){
+    const losses=Math.min(P.total,0);
+    if(P.total<0){
+      const offset=Math.min(Math.abs(P.total),S.ytd||0);
+      const ordinary=Math.min(3000,Math.abs(P.total)-offset);
+      const carry=Math.abs(P.total)-offset-ordinary;
+      const saved=offset*S.rate+ordinary*(S.rate+0.10);
+      planHtml=`<div class="plan"><h3>Your sale plan, ${P.cnt} lot${P.cnt>1?'s':''} selected</h3>
+       <div class="rowline"><span>Losses you'd realize<span class="tip" tabindex="0" data-tip="Realize means actually sell. Until you sell, a loss is only on paper and doesn’t count for taxes.">ⓘ</span></span><span class="num loss">${fmtP(P.total)}${(P.st<0||P.lt<0)?` <span class="hint" style="display:inline">(ST ${fmtP(Math.min(P.st,0))} / LT ${fmtP(Math.min(P.lt,0))}${P.unk<0?' / term unknown '+fmtP(P.unk):''})</span>`:''}</span></div>
+       <div class="rowline"><span>Offsets your realized gains</span><span class="num">${fmt(offset)} of ${fmt(S.ytd||0)}</span></div>
+       <div class="rowline"><span>Deducts against ordinary income<span class="tip" tabindex="0" data-tip="Ordinary income is your regular income, like wages, salary and interest. After losses cancel your gains, up to $3,000 of leftover losses can reduce this too, each year.">ⓘ</span></span><span class="num">${fmt(ordinary)}</span></div>
+       <div class="rowline"><span>Carries forward to future years<span class="tip" tabindex="0" data-tip="Unused losses never expire. They roll into next year automatically, offsetting future gains, plus another $3,000 of regular income every year until used up.">ⓘ</span></span><span class="num">${fmt(carry)}</span></div>
+       <div class="rowline"><span><b>Estimated tax savings</b></span><span class="num gain big-save">≈ ${fmt(saved)}</span></div>
+       ${P.locked>0?`<p class="hint" style="color:#7a5c00;background:#fdf3ce;padding:9px 12px;border-radius:8px;margin-top:12px">⚠️ ${P.locked} selected ESPP lot${P.locked>1?'s have':' has'} not reached the qualifying date. Selling now triggers ordinary income on the purchase discount, even at a loss. First one clears ${fmtD(P.lockedEarliest)}. Consider unchecking until then.</p>`:''}
+       <div style="margin-top:12px"><button class="pill" onclick="exportLotsCsv(true)">Download plan (CSV)</button></div>
+      </div>`;
+    }else{
+      planHtml=`<div class="plan"><h3>Your sale plan, ${P.cnt} lot${P.cnt>1?'s':''} selected</h3>
+       <div class="rowline"><span>Your selection nets a <b>gain</b>, not a loss</span><span class="num gain">+${fmt(P.total)}</span></div>
+       <p class="hint">Selling these adds to your taxable gains. Uncheck gain lots, or pair them with more loss lots to offset.</p></div>`;
+    }
+  }
+  const lotRows=r=>{
+    const exp=expandedRows.has(r.acct+'|'+r.symbol);
+    if(!r.lots||!r.lots.length||!exp)return '';
+    const n=r.lots.length;
+    let h=`<tr class="lot-ctl"><td colspan="8" style="padding-left:38px">Lots, sorted by
+      <button style="${lotSort==='date'?'font-weight:700':''}" onclick="setLotSort('date')">date</button>·<button style="${lotSort==='loss'?'font-weight:700':''}" onclick="setLotSort('loss')">loss</button> , then check the ones to include in your plan</td></tr>`;
+    const order=r.lots.map((l,i)=>({l,i}));
+    order.sort((x,y)=>lotSort==='loss'
+      ?(x.l.qty*(r.price-x.l.basis))-(y.l.qty*(r.price-y.l.basis))
+      :(new Date(x.l.acquired)-new Date(y.l.acquired))||x.i-y.i);
+    h+=order.map(({l,i})=>{
+      const g=l.qty*(r.price-l.basis);
+      return `<tr class="lot-row">
+       <td style="padding-left:38px" class="num">${l.acquired||'?'}</td>
+       <td>${(l.qualifyDate&&l.qualifyDate>today())?`<span class="tag warn" style="margin:0" title="This ESPP lot has not reached its qualifying date (2 years from grant and 1 year from purchase). Selling before then triggers ordinary income on the purchase discount, even when selling at a loss.">qualifies ${fmtD(l.qualifyDate)}</span>`:l.term?`<span class="tag ${l.term==='LT'?'ok':'info'}" style="margin:0" title="${l.term==='LT'?'Long term means held over a year. Gains here get the lower tax rates.':'Short term means held under a year. Gains here are taxed like regular income, so losses here can be extra valuable.'}${l.qualifyDate?' ESPP-qualified since '+fmtD(l.qualifyDate)+'.':''}">${l.term}</span>`:''}</td>
+       <td class="r num">${l.qty.toLocaleString()}</td>
+       <td class="r num">${fmt(l.qty*r.price)}</td>
+       <td class="r num">${fmt2(l.basis)}/sh</td>
+       <td class="r num ${g<0?'loss':'gain'}">${g<0?fmtP(g):'+'+fmt(g)}</td>
+       <td></td>
+       <td class="r"><input type="checkbox" ${lotChecked(r.acct,r.symbol,i,l,r.price)?'checked':''} onchange="togglePlan('${lotKey(esc(r.acct),r.symbol,i)}',this.checked)" aria-label="Include ${r.symbol} lot ${l.acquired||i}" style="margin-right:0"></td></tr>`;}).join('');
+    return h;};
+  $('#report').innerHTML=(A.losers.length?planHtml+`
+   <table style="margin-top:14px"><thead><tr>
+    <th class="sort" tabindex="0" role="button" aria-sort="${sortCol==='symbol'?(sortDir===1?'ascending':'descending'):'none'}" onclick="setSort('symbol')" onkeydown="kbSort(event,'symbol')">Position${arrow('symbol')}</th>
+    <th class="sort" tabindex="0" role="button" aria-sort="${sortCol==='acct'?(sortDir===1?'ascending':'descending'):'none'}" onclick="setSort('acct')" onkeydown="kbSort(event,'acct')">Account${arrow('acct')}</th>
+    <th class="r sort" tabindex="0" role="button" aria-sort="${sortCol==='qty'?(sortDir===1?'ascending':'descending'):'none'}" onclick="setSort('qty')" onkeydown="kbSort(event,'qty')">Qty${arrow('qty')}</th>
+    <th class="r sort" tabindex="0" role="button" aria-sort="${sortCol==='val'?(sortDir===1?'ascending':'descending'):'none'}" onclick="setSort('val')" onkeydown="kbSort(event,'val')">Value${arrow('val')}</th>
+    <th class="r sort" tabindex="0" role="button" aria-sort="${sortCol==='basisTotal'?(sortDir===1?'ascending':'descending'):'none'}" onkeydown="kbSort(event,'basisTotal')" onclick="setSort('basisTotal')" title="How much you paid for this stock in total, including any reinvested dividends. This matches the Cost Basis column on your brokerage statements.">Cost basis${arrow('basisTotal')}</th>
+    <th class="r sort" tabindex="0" role="button" aria-sort="${sortCol==='gl'?(sortDir===1?'ascending':'descending'):'none'}" onclick="setSort('gl')" onkeydown="kbSort(event,'gl')">Loss if sold${arrow('gl')}</th><th></th><th class="r">In plan</th></tr></thead>
+   <tbody>${sorted.map(r=>{
+    const hasLots=r.lots&&r.lots.length;
+    const exp=expandedRows.has(r.acct+'|'+r.symbol);
+    const caret=hasLots
+      ?`<button class="caret" onclick="toggleExpand('${esc(r.acct)}','${r.symbol}')" aria-label="Show lots">${exp?'▾':'▸'}</button>`
+      :`<button class="caret" onclick="lotDrill('${esc(r.acct)}','${r.symbol}')" aria-label="Add lot detail" title="Add lot detail">▸</button>`;
+    let planCell;
+    if(hasLots){
+      const n=r.lots.length;
+      const sel=r.lots.filter((l,i)=>lotChecked(r.acct,r.symbol,i,l,r.price)).length;
+      planCell=`<span class="hint" style="display:inline;margin:0 6px 0 0">${sel}/${n}</span><input type="checkbox" ${sel===n?'checked':''} ${sel>0&&sel<n?'data-ind="1"':''} onchange="setAllLots('${esc(r.acct)}','${r.symbol}',${n},this.checked)" aria-label="Include all ${r.symbol} lots in plan" style="margin-right:0">`;
+    }else{
+      planCell=`<input type="checkbox" ${posSelChecked(r.acct,r.symbol)?'checked':''} onchange="togglePlan('${posKey(esc(r.acct),r.symbol)}',this.checked)" aria-label="Include ${r.symbol} in plan" style="margin-right:0">`;
+    }
+    return `<tr><td class="sym">${caret}${r.symbol}</td><td style="color:var(--ink2);font-size:.8rem">${r.acct.split(' · ')[0]}</td>
+    <td class="r num">${r.qty.toLocaleString()}</td><td class="r num">${fmt(r.val)}</td><td class="r num">${fmt(r.basisTotal)}</td>
+    <td class="r num loss">${fmtP(r.gl)}</td>
+    <td>${r.lotInfo?`<span class="tag info">${r.lotInfo.n} of ${r.lotInfo.total} lots underwater${r.lotInfo.st<0&&r.lotInfo.lt<0?` · ST ${fmtP(r.lotInfo.st)} / LT ${fmtP(r.lotInfo.lt)}`:r.lotInfo.st<0?' · short-term':' · long-term'}</span>`:''}${r.multiAcct?'<span class="tag warn" title="You hold this in more than one account. If any of them automatically reinvests dividends, that counts as a purchase and can cancel your loss (the wash-sale rule). Turn reinvestment off before selling.">in 2+ accounts, wash sale risk</span>':''}</td><td class="r">${planCell}</td></tr>`+lotRows(r);
+   }).join('')}</tbody></table>
+   <div style="margin-top:12px"><button class="pill ghost" onclick="exportLotsCsv(false)">Download all lots (CSV)</button></div>
+   <div class="hint" style="margin-top:12px;line-height:1.7">
+    <b>Wash-sale rule:</b> don’t rebuy a sold security within 30 days before or after the sale. Automatic dividend reinvestment in any of your household’s accounts counts.<br>
+    <b>Short vs long term:</b> needs per-lot purchase dates. Most positions files don’t have them, so use “+ lot detail.”
+    ${S.accounts.some(x=>/ESPP/i.test(x.name))?'<br><b>ESPP rules:</b> selling within 2 years of the grant date can trigger ordinary income on the discount, even at a loss. Check each lot’s qualifying date first.':''}
+   </div>`
+   :`<p class="hint" style="margin:16px 0">No underwater positions found${A.noBasis.length?' among positions with cost basis data':''}. Nothing to harvest, and that’s a good problem.</p>`);
+  document.querySelectorAll('#report input[data-ind="1"]').forEach(el=>el.indeterminate=true);
+  document.querySelectorAll('.tip[data-tip]').forEach(t=>{if(!t.getAttribute('aria-label'))t.setAttribute('aria-label',t.dataset.tip)});
+  if(A.noBasis.length)$('#report').insertAdjacentHTML('beforeend',`<p class="hint">⚠️ ${A.noBasis.length} positions imported without cost basis (${[...new Set(A.noBasis.map(r=>r.symbol))].slice(0,6).join(', ')}${A.noBasis.length>6?'…':''}) that can’t be analyzed. without cost basis there's nothing to compare against, so these can't be analyzed. Some brokerages leave it out of the standard holdings download. Vanguard is one: use its Cost basis → Unrealized gains/losses export instead, which includes both. For others, look for a cost basis export and drop it in; the column mapper will place the columns.</p>`);
+  $('#acctSum').textContent=`${S.accounts.length} imported · ${fmt(S.accounts.reduce((s,x)=>s+x.rows.reduce((t,r)=>t+r.qty*(r.price||0),0),0))}`;
+  $('#accts').innerHTML=S.accounts.map((a,i)=>`<div class="acct"><span>${a.name}<span class="tag">${a.rows.length} positions</span></span>
+   <span><span class="num" style="color:var(--ink2)">${fmt(a.rows.reduce((s,r)=>s+r.qty*(r.price||0),0))}</span>
+   <button class="x" onclick="rmAcct(${i})" aria-label="Remove ${a.name}">✕</button></span></div>`).join('');
+}
+function rmAcct(i){S.accounts.splice(i,1);save();toast('Account removed')}
+
+/* ---------- report download ---------- */
+function exportReport(){
+  const A=analyze();const d=new Date().toISOString().slice(0,10);
+  const q=c=>/[",\n]/.test(String(c))?'"'+String(c).replace(/"/g,'""')+'"':c;
+  const line=arr=>arr.map(q).join(',');
+  const out=[];
+  out.push(line(['GLEANER HARVEST REPORT',d]));
+  out.push(line(['Portfolio imported',A.totalVal.toFixed(2)]));
+  out.push(line(['Accounts',S.accounts.length]));
+  out.push(line(['Realized gains entered (YTD)',(S.ytd||0).toFixed(2)]));
+  out.push(line(['Assumed combined tax rate',(S.rate*100).toFixed(1)+'% (federal '+(S.fed*100).toFixed(1)+'% + state '+(S.stateRate||0).toFixed(1)+'%)']));
+  out.push(line(['Total harvestable losses',A.totalLoss.toFixed(2)]));
+  const P=planImpact();
+  if(P.cnt>0&&P.total<0){
+    const offset=Math.min(Math.abs(P.total),S.ytd||0);
+    const ordinary=Math.min(3000,Math.abs(P.total)-offset);
+    const carry=Math.abs(P.total)-offset-ordinary;
+    const saved=offset*S.rate+ordinary*(S.rate+0.10);
+    out.push('');
+    out.push(line(['SALE PLAN','']));
+    out.push(line(['Lots selected',P.cnt]));
+    out.push(line(['Losses to realize',P.total.toFixed(2)]));
+    out.push(line(['Short-term portion',Math.min(P.st,0).toFixed(2)]));
+    out.push(line(['Long-term portion',Math.min(P.lt,0).toFixed(2)]));
+    if(P.unk<0)out.push(line(['Term unknown portion',P.unk.toFixed(2)]));
+    out.push(line(['Offsets realized gains',offset.toFixed(2)]));
+    out.push(line(['Against ordinary income',ordinary.toFixed(2)]));
+    out.push(line(['Carryforward to future years',carry.toFixed(2)]));
+    out.push(line(['Estimated tax savings',saved.toFixed(2)]));
+  }
+  out.push('');
+  out.push(line(['UNDERWATER POSITIONS','','','','','','']));
+  out.push(line(['symbol','account','quantity','current_value','cost_basis','loss_if_sold','held_in_multiple_accounts']));
+  A.losers.forEach(r=>out.push(line([r.symbol,r.acct,r.qty,r.val.toFixed(2),r.basisTotal.toFixed(2),r.gl.toFixed(2),r.multiAcct?'yes':'no'])));
+  out.push('');
+  out.push(line(['Educational calculator output - not investment or tax advice. Verify with a tax professional. Mind the 30-day wash-sale window (including dividend reinvestment) in all household accounts.']));
+  download(`gleaner-report-${d}.csv`,out.join('\n'));
+  toast('Report downloaded as CSV, opens in Excel or Sheets');
+}
+function download(name,content){const el=document.createElement('a');
+  el.href=URL.createObjectURL(new Blob([content],{type:'text/csv'}));el.download=name;el.click();URL.revokeObjectURL(el.href)}
+
+/* ---------- per-position lot drill-down ---------- */
+function lotDrill(acctName,symbol){
+  openDlg(`<h2 style="font-size:1.3rem">Add lot detail for ${symbol}</h2>
+   <p class="hint" style="margin-top:6px">On your brokerage's positions page, open <b>${symbol}</b>'s lot details (Schwab: the row's menu → Lot Details → Export) and drop that one file here. You'll get the short- vs long-term split, and the report will count only the underwater lots.</p>
+   <div id="mapErr" class="maperr" hidden></div>
+   <label style="margin-top:14px">Lot file for ${symbol}</label><input type="file" id="lotfile" accept=".csv">`,
+  ()=>{const f=document.getElementById('lotfile').files[0];
+    if(!f){mapErr('Choose the lot CSV first.');return false}
+    f.text().then(text=>mapLots(acctName,symbol,text));return true;},'Continue');
+}
+function mapLots(acctName,symbol,text){
+  const L=text.split(/\r?\n/).filter(l=>l.trim());
+  let hi=L.findIndex(l=>{const c=splitLine(l);return c.length>=2&&c.filter(x=>num(x)==null&&x.trim()).length>=2});
+  if(hi<0)hi=0;
+  const head=splitLine(L[hi]).map(x=>x.trim()||'(blank)');
+  const opts=sel=>'<option value="-1">None</option>'+head.map((h,i)=>`<option value="${i}" ${i===sel?'selected':''}>${h}</option>`).join('');
+  const guess=names=>head.findIndex(h=>names.some(n=>h.toLowerCase().includes(n)));
+  openDlg(`<h2 style="font-size:1.3rem">Map ${symbol}'s lot columns</h2>
+   <div id="mapErr" class="maperr" hidden></div>
+   <div class="row"><div><label>Quantity *</label><select id="l0">${opts(guess(['quantity','qty','shares']))}</select></div>
+   <div><label>Acquired date *</label><select id="l1">${opts(guess(['open date','acquired','purchase date','date']))}</select></div></div>
+   <div class="row"><div><label>Cost basis *</label><select id="l2">${opts(guess(['cost/share','cost per share','unit cost','price paid','cost basis','cost']))}</select></div>
+   <div><label>Basis is…</label><select id="l3"><option value="per">Per share</option><option value="total">Total $ for the lot</option></select></div></div>
+   <div class="mapper-prev">${L.slice(hi,hi+5).join('\n').replace(/</g,'&lt;')}</div>`,
+  ()=>{const gi=id=>+document.getElementById(id).value;
+    const qi=gi('l0'),ai=gi('l1'),bi=gi('l2'),per=document.getElementById('l3').value==='per';
+    if(qi<0||ai<0||bi<0){mapErr('Choose a column for quantity, acquired date, and cost basis.');return false}
+    const lots=[];const now=Date.now();
+    for(const l of L.slice(hi+1)){const c=splitLine(l).map(x=>x.trim());
+      const qty=num(c[qi]);if(qty==null||qty<=0)continue;
+      const d=new Date(c[ai]);if(isNaN(d))continue;
+      let basis=num(c[bi]);if(basis==null)continue;if(!per)basis/=qty;
+      lots.push({qty,basis,acquired:c[ai],term:(now-d.getTime())/86400000>365?'LT':'ST'});}
+    if(!lots.length){mapErr('No lots found. Check that the columns you picked hold numbers and dates.');return false}
+    const acct=S.accounts.find(a=>a.name===acctName);
+    const row=acct&&acct.rows.find(r=>r.symbol===symbol);
+    if(!row){toast('Position not found');return false}
+    row.lots=lots;
+    const lotQty=lots.reduce((s,l)=>s+l.qty,0);
+    save();toast(`${lots.length} lots added to ${symbol}`+(Math.abs(lotQty-row.qty)>0.01?`. Heads up, lots total ${lotQty.toLocaleString()} shares vs ${row.qty.toLocaleString()} in the position`:''));
+    return true;},'Add lots');
+}
+function exportLotsCsv(planOnly){
+  const rows=[['account','symbol','acquired','quantity','cost_basis_per_share','current_price','current_value','gain_loss','term','underwater','in_plan','espp_qualify_date']];
+  allRows().forEach(r=>{
+    if(r.lots&&r.lots.length){
+      r.lots.forEach((l,i)=>{const g=l.basis!=null?l.qty*((r.price||0)-l.basis):'';
+        rows.push([r.acct,r.symbol,l.acquired||'',l.qty,l.basis!=null?l.basis.toFixed(2):'',(r.price||0).toFixed(2),(l.qty*(r.price||0)).toFixed(2),g===''?'':g.toFixed(2),l.term||'',g!==''&&g<0?'yes':'no',(g!==''&&lotChecked(r.acct,r.symbol,i,l,r.price))?'yes':'no',l.qualifyDate||'']);});
+    }else{
+      const g=r.basisTotal!=null?r.qty*(r.price||0)-r.basisTotal:'';
+      const under=g!==''&&g<-1;
+      rows.push([r.acct,r.symbol,'',r.qty,r.basisTotal!=null?(r.basisTotal/r.qty).toFixed(2):'',(r.price||0).toFixed(2),(r.qty*(r.price||0)).toFixed(2),g===''?'':g.toFixed(2),'',under?'yes':'no',under&&posSelChecked(r.acct,r.symbol)?'yes':'no','']);
+    }});
+  const body=planOnly?rows.filter((r,i)=>i===0||r[10]==='yes'):rows;
+  const csv=body.map(r=>r.map(c=>/[",\n]/.test(String(c))?'"'+String(c).replace(/"/g,'""')+'"':c).join(',')).join('\n');
+  const a2=document.createElement('a');a2.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a2.download=`gleaner-${planOnly?'plan':'all'}-lots-${new Date().toISOString().slice(0,10)}.csv`;a2.click();URL.revokeObjectURL(a2.href);
+  toast(planOnly?'Plan downloaded, only the lots you selected':'All lots downloaded, with your plan marked');
+}
+/* ---------- year-end reminder (.ics, no email, no tracking) ---------- */
+function remindMe(){
+  const now=new Date();let y=now.getFullYear();
+  let target=new Date(y,11,1); // Dec 1
+  if(now>target){target=new Date(now.getTime()+7*86400000);if(target.getMonth()!==11||target.getDate()>24)target=new Date(y+1,11,1);}
+  const ymd=target.toISOString().slice(0,10).replace(/-/g,'');
+  const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Gleaner//EN','BEGIN:VEVENT',
+   'UID:gleaner-'+ymd+'@local','DTSTART;VALUE=DATE:'+ymd,'SUMMARY:Harvest tax losses before Dec 31',
+   'DESCRIPTION:Download fresh positions CSVs from each brokerage and open gleanerapp.com. Losses must be realized by Dec 31 to count this tax year. Mind the 30 day wash sale window, since harvesting in early December keeps year end flexibility.',
+   'END:VEVENT','END:VCALENDAR'].join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar'}));
+  a.download='gleaner-year-end-reminder.ics';a.click();URL.revokeObjectURL(a.href);
+  toast('Reminder downloaded, open it to add to your calendar');
+}
+/* ---------- demo & housekeeping ---------- */
+function whichFile(){
+  openDlg(`<h2 style="font-size:1.3rem">Get the right files</h2>
+   <p class="hint" style="margin-top:6px">Three kinds of files tell the whole story, the same three an accountant asks for.</p>
+   <p class="hint" style="margin-top:8px"><b>① Positions (with cost basis)</b> is what you hold now, per account, and it powers the harvest report<br>
+   <b>② Realized gain/loss, year to date</b> is what you already sold, and it fills the gains field automatically<br>
+   <b>③ Lot details</b> is for anything you might sell, and it unlocks the short and long term split</p>
+   <table style="margin-top:14px;font-size:.8rem"><thead><tr><th>Brokerage</th><th>Where to click</th><th>Gives you</th></tr></thead><tbody>
+    <tr><td class="sym">Schwab</td><td>Accounts → Positions → Export (top right)</td><td class="num">①</td></tr>
+    <tr><td class="sym">Schwab</td><td>Accounts → Realized Gain/Loss → Export</td><td class="num">②</td></tr>
+    <tr><td class="sym">Schwab</td><td>Position row menu → Lot Details → Export (one per stock)</td><td class="num">③</td></tr>
+    <tr><td class="sym">Fidelity</td><td>Positions → Download</td><td class="num">①</td></tr>
+    <tr><td class="sym">E*TRADE</td><td>Portfolio → Download → Portfolio</td><td class="num">①</td></tr>
+    <tr><td class="sym">Vanguard</td><td>Cost basis → <b>Unrealized gains/losses</b> → download. This one file covers positions and lot detail together, so it's the only one you really need.</td><td class="num">① + ③</td></tr>
+    <tr><td class="sym">Vanguard</td><td>Cost basis → Realized gains/losses → download (summary or detail)</td><td class="num">②</td></tr>
+    <tr><td class="sym">SoFi</td><td>Investing → Documents → cost basis export. The unrealized one covers holdings and lots, the realized one fills your gains.</td><td class="num">① + ③, and ②</td></tr>
+    <tr><td class="sym">E*TRADE employee stock plan (RSU / ESPP)</td><td>At Work → Holdings → Download</td><td class="num">① + ③</td></tr>
+    <tr><td class="sym">E*TRADE employee stock plan (RSU / ESPP)</td><td>At Work → Gains & Losses → Download Expanded</td></tr>
+    <tr><td class="sym">J.P. Morgan</td><td>Positions → tax lots view → download</td><td class="num">① + ③</td></tr>
+   </tbody></table>
+   <p class="hint" style="margin-top:12px"><b>Don't worry about what the file is called.</b> Gleaner identifies files by what's inside, not their names. Drop anything in and it sorts positions from realized gains from lot detail automatically. If it truly can't tell, the column mapper asks you.</p>
+   <p class="hint" style="margin-top:8px"><b>For your accountant:</b> Gleaner's two downloads, the report and the lots CSV (which marks each lot in or out of your sale plan), plus the original brokerage files are everything they need to verify your trades at tax time.</p>
+   <p class="hint" style="margin-top:8px"><b>Retirement accounts don't apply.</b> 401(k), 403(b), and IRA files won't help, because losses inside tax advantaged accounts can't be harvested. Only taxable brokerage and employee stock plan accounts count. (Fidelity NetBenefits hosts both, so pick the stock plan side, not the retirement plan.)</p>
+   <p class="hint" style="margin-top:8px">What doesn't import: Excel (.xlsx) files, which you re-save as CSV first, and transaction histories from other brokerages (type those gains in by hand).</p>`,
+  ()=>{},'Got it');
+}
+function demo(){
+  S={ytd:42000,fed:0.15,stateRate:5,state:'',rate:0.20,demo:true,plan:{},accounts:[
+   {name:'Schwab · demo',rows:[
+    {symbol:'AAPL',qty:120,price:317.31,basisTotal:14200},
+    {symbol:'NVDA',qty:200,price:171.90,basisTotal:9800},
+    {symbol:'PYPL',qty:310,price:58.20,basisTotal:34100},
+    {symbol:'NKE',qty:150,price:61.75,basisTotal:15900,lots:[{qty:60,basis:125,acquired:'2023-05-10',term:'LT'},{qty:50,basis:100,acquired:'2024-11-20',term:'LT'},{qty:40,basis:85,acquired:'2025-12-01',term:'ST'}]},
+    {symbol:'VOO',qty:90,price:566.10,basisTotal:38200}]},
+   {name:'Fidelity · demo',rows:[
+    {symbol:'MRNA',qty:180,price:31.40,basisTotal:21400},
+    {symbol:'INTC',qty:400,price:23.85,basisTotal:17800},
+    {symbol:'MSFT',qty:60,price:390.99,basisTotal:19100},
+    {symbol:'NKE',qty:80,price:61.75,basisTotal:9400}]}]};
+  save();toast('Demo portfolio loaded, two accounts, fictional data');
+}
+function wipe(){openDlg(`<h2 style="font-size:1.3rem">Erase everything?</h2><p class="hint" style="margin-top:8px">Removes all imported data from this browser. Nothing was ever sent anywhere, so this is the whole ballgame.</p>`,
+  ()=>{localStorage.removeItem(KEY);S={accounts:[],ytd:0,fed:0.15,stateRate:0,state:'',rate:0.15,demo:false,plan:{}};render();toast('Erased')},'Erase');}
+S.plan=S.plan||{};
+const STATES=[["","Choose state…",null],["AL","Alabama",5.0],["AK","Alaska",0],["AZ","Arizona",2.5],["AR","Arkansas",3.9],["CA","California",9.3],["CO","Colorado",4.4],["CT","Connecticut",7.0],["DE","Delaware",6.6],["DC","District of Columbia",8.5],["FL","Florida",0],["GA","Georgia",5.4],["HI","Hawaii",7.25],["ID","Idaho",5.7],["IL","Illinois",4.95],["IN","Indiana",3.0],["IA","Iowa",3.8],["KS","Kansas",5.6],["KY","Kentucky",4.0],["LA","Louisiana",3.0],["ME","Maine",7.15],["MD","Maryland",5.75],["MA","Massachusetts",5.0],["MI","Michigan",4.25],["MN","Minnesota",7.85],["MS","Mississippi",4.4],["MO","Missouri",4.7],["MT","Montana",4.9],["NE","Nebraska",5.2],["NV","Nevada",0],["NH","New Hampshire",0],["NJ","New Jersey",6.4],["NM","New Mexico",4.9],["NY","New York",6.85],["NC","North Carolina",4.25],["ND","North Dakota",2.5],["OH","Ohio",3.5],["OK","Oklahoma",4.75],["OR","Oregon",9.9],["PA","Pennsylvania",3.07],["RI","Rhode Island",6.0],["SC","South Carolina",3.9],["SD","South Dakota",0],["TN","Tennessee",0],["TX","Texas",0],["UT","Utah",4.55],["VT","Vermont",8.75],["VA","Virginia",5.75],["WA","Washington",0],["WV","West Virginia",4.8],["WI","Wisconsin",5.3],["WY","Wyoming",0],["custom","Custom / other",null]];
+if(S.fed===undefined){S.fed=0.15;S.stateRate=Math.max(0,Math.round((((S.rate||0.20)-0.15))*1000)/10);S.state='custom';}
+function recalcRate(){S.rate=S.fed+(S.stateRate||0)/100;save()}
+function pickState(code){S.state=code;const st=STATES.find(s=>s[0]===code);if(st&&st[2]!=null)S.stateRate=st[2];recalcRate()}
+const expandedRows=new Set();
+const esc=s=>String(s).replace(/'/g,"\\'");
+const lotKey=(acct,sym,i)=>acct+'|'+sym+'|'+i;
+const posKey=(acct,sym)=>acct+'|'+sym+'|pos';
+function lotChecked(acct,sym,i,lot,price){const k=lotKey(acct,sym,i);return k in S.plan?!!S.plan[k]:lot.qty*(price-lot.basis)<0}
+function posSelChecked(acct,sym){const k=posKey(acct,sym);return k in S.plan?!!S.plan[k]:true}
+function togglePlan(k,v){S.plan[k]=v;save()}
+function toggleExpand(acct,sym){const k=acct+'|'+sym;expandedRows.has(k)?expandedRows.delete(k):expandedRows.add(k);render()}
+function setAllLots(acct,sym,n,v){for(let i=0;i<n;i++)S.plan[lotKey(acct,sym,i)]=v;save()}
+function planImpact(){
+  let st=0,lt=0,unk=0,cnt=0,locked=0,lockedEarliest='';
+  allRows().forEach(r=>{
+    if(r.basisTotal==null||!(r.price>0))return;
+    if(r.lots&&r.lots.length&&r.lots.every(l=>l.basis!=null)){
+      r.lots.forEach((l,i)=>{if(lotChecked(r.acct,r.symbol,i,l,r.price)){
+        const g=l.qty*(r.price-l.basis);cnt++;
+        if(l.qualifyDate&&l.qualifyDate>today()){locked++;
+          if(!lockedEarliest||l.qualifyDate<lockedEarliest)lockedEarliest=l.qualifyDate;}
+        if(l.term==='LT')lt+=g;else if(l.term==='ST')st+=g;else unk+=g;}});
+    }else{
+      const g=r.qty*r.price-r.basisTotal;
+      if(g<-1&&posSelChecked(r.acct,r.symbol)){unk+=g;cnt++;}
+    }});
+  return {st,lt,unk,total:st+lt+unk,cnt,locked,lockedEarliest};
+}
+let lotSort='date';
+function setLotSort(v){lotSort=v;render()}
+let sortCol='gl',sortDir=1;
+function kbSort(e,c){if(e.key==='Enter'||e.key===' '){e.preventDefault();setSort(c)}}
+function setSort(c){if(sortCol===c)sortDir*=-1;else{sortCol=c;sortDir=1}render()}
+let dlgOk=null;
+function openDlg(html,onOk,okLabel){const d=$('#dlg');dlgOk=onOk;
+  d.innerHTML=html+`<div class="d-actions"><button class="pill ghost" onclick="document.getElementById('dlg').close()">Cancel</button>
+  <button class="pill blue" id="ok">${okLabel||'Save'}</button></div>`;
+  d.querySelector('#ok').onclick=()=>{const r=dlgOk&&dlgOk();if(r!==undefined&&!r)return;d.close()};d.showModal();}
+render();
+</script>
+</body>
+</html>
