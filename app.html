@@ -20,6 +20,8 @@ nav .spacer{flex:1}
 .pill{background:var(--ink);color:#fff;border:none;border-radius:980px;padding:7px 16px;font-size:.82rem;font-weight:500}
 .pill.blue{background:var(--accent)}
 .pill.ghost{background:var(--panel);color:var(--ink)}
+.pill.text{background:none;color:var(--ink2)}
+.pill.text:hover{background:var(--panel)}
 h1{font-size:clamp(2.2rem,6vw,3.4rem);font-weight:700;letter-spacing:-.025em;line-height:1.08}
 h2{font-size:1.6rem;font-weight:700;letter-spacing:-.02em;margin-bottom:6px}
 h3{font-size:1.02rem;font-weight:600}
@@ -128,7 +130,7 @@ details.card summary .hint{font-weight:400;margin-left:8px}
   <h2>Harvest report</h2>
   <p class="sub" style="font-size:.9rem">Positions currently worth less than you paid, ranked by loss. Selling realizes the loss for your tax return.</p>
   <div class="row" style="margin:14px 0 6px;max-width:860px">
-   <div><label>Gains you've already realized this year ($)<span class="tip" tabindex="0" data-tip="Enter a negative number if your sales so far add up to a net loss. Realized means you actually sold. Profits still sitting in investments don’t count yet. Type your total here, or drop your brokerage's realized gain/loss CSV onto the page and this fills itself. E*TRADE and Schwab formats are read automatically.">ⓘ</span></label><input id="ytd" type="number" placeholder="0" onchange="S.ytd=+this.value||0;save()"></div>
+   <div><label>Gains you've already realized this year ($)<span class="tip" tabindex="0" data-tip="Enter a negative number if your sales so far add up to a net loss. Realized means you actually sold. Profits still sitting in investments don’t count yet. Type your total here, or drop your brokerage's realized gain/loss CSV onto the page and this fills itself. E*TRADE and Schwab formats are read automatically.">ⓘ</span></label><input id="ytd" type="number" placeholder="0" onchange="S.ytd=+this.value||0;save()"><div class="hint" id="gainsplit"></div></div>
    <div><label>Federal rate on long-term gains<span class="tip" tabindex="0" data-tip="Not your income tax bracket. Long term capital gains (held over a year) have their own lower schedule: 0%, 15%, or 20% depending on household income, plus an extra 3.8% on investment income once household income passes ~$250K married or ~$200K single. The IRS calls that the net investment income tax, or NIIT. Pick the tier matching your total household income.">ⓘ</span></label><select id="fed" onchange="S.fed=+this.value;recalcRate()">
     <option value="0">0% for income under ~$97K married or ~$48K single</option>
     <option value="0.15">15% for income up to ~$250K</option>
@@ -181,39 +183,47 @@ async function handleFile(f){
     S.realized=S.realized||{};
     const others=Object.keys(S.realized).filter(k=>k!==f.name);
     if(others.length){
-      pendingRealized={name:f.name,total:parsed.total,source:parsed.source};
+      pendingRealized={name:f.name,total:parsed.total,source:parsed.source,gains:parsed.gains,losses:parsed.losses};
       openDlg(`<h2 style="font-size:1.3rem">You already imported a sales file</h2>
-       <p class="hint" style="margin-top:8px">Gleaner is holding ${fmt(Object.values(S.realized).reduce((s,v)=>s+v,0))} in realized gains from:</p>
-       <ul style="font-size:.85rem;color:var(--ink2);margin:8px 0 0 20px">${others.map(k=>`<li>${k} (${fmt(S.realized[k])})</li>`).join('')}</ul>
+       <p class="hint" style="margin-top:8px">Gleaner is holding ${fmt(Object.values(S.realized).reduce((s,v)=>s+rTotal(v),0))} in realized gains from:</p>
+       <ul style="font-size:.85rem;color:var(--ink2);margin:8px 0 0 20px">${others.map(k=>`<li>${k} (${fmt(rTotal(S.realized[k]))})</li>`).join('')}</ul>
        <p class="hint" style="margin-top:12px"><b>${f.name}</b> adds ${fmt(parsed.total)}.</p>
        <p class="hint" style="margin-top:8px">Add it only if it covers different sales. An account level file usually already includes your stock plan sales, so importing both counts them twice.</p>
-       <div style="display:flex;gap:10px;margin-top:16px">
-        <button class="pill" onclick="applyRealized('replace')">Replace what's there</button>
-        <button class="pill ghost" onclick="applyRealized('add')">Add to it</button>
-       </div>`,()=>{},'Cancel');
+`,null,null,`<div class="d-actions">
+        <button class="pill text" onclick="document.getElementById('dlg').close()">Cancel</button>
+        <button class="pill ghost" onclick="applyRealized('add')">Add</button>
+        <button class="pill blue" onclick="applyRealized('replace')">Replace</button>
+       </div>`);
       return;
     }
-    applyRealizedNow(f.name,parsed.total,parsed.source);return}
+    applyRealizedNow(f.name,parsed.total,parsed.source,parsed.gains,parsed.losses);return}
   if(parsed){finishImport(parsed.name,parsed.rows,f.name)}
   else openMapper(text,f.name);
 }
 let pendingRealized=null;
-function applyRealizedNow(name,total,source){
+function rTotal(v){return typeof v==='number'?v:(v&&v.total)||0}
+function realizedSplit(){
+  let g=0,l=0,any=false;
+  Object.values(S.realized||{}).forEach(v=>{
+    if(v&&typeof v==='object'&&v.gains!=null){g+=v.gains;l+=v.losses||0;any=true}});
+  return {gains:g,losses:l,any};
+}
+function applyRealizedNow(name,total,source,gains,losses){
   S.realized=S.realized||{};
-  const prev=S.realized[name]||0;
+  const prev=rTotal(S.realized[name]);
   S.ytd=Math.round(((S.ytd||0)-prev+total)*100)/100;
-  S.realized[name]=total;S.demo=false;save();
+  S.realized[name]=(gains!=null)?{total,gains,losses}:total;S.demo=false;save();
   toast(`${source}: ${fmt(total)} realized, added to the gains field`);
 }
 function applyRealized(mode){
   const p=pendingRealized; if(!p)return;
   document.getElementById('dlg').close();
   if(mode==='replace'){S.realized={};S.ytd=0;}
-  applyRealizedNow(p.name,p.total,p.source);
+  applyRealizedNow(p.name,p.total,p.source,p.gains,p.losses);
   pendingRealized=null;
 }
 function rmRealized(name){
-  const v=S.realized[name]||0;
+  const v=rTotal(S.realized[name]);
   S.ytd=Math.round(((S.ytd||0)-v)*100)/100;
   delete S.realized[name];save();toast('Removed '+name);
 }
@@ -238,32 +248,32 @@ function detect(text){
     const hi=L.findIndex(l=>/"?Symbol"?/.test(l)&&/Gain\/Loss/.test(l));
     if(hi>=0){const h=splitLine(L[hi]).map(x=>x.trim().replace(/^"|"$/g,''));
       const gi=h.findIndex(x=>x.toLowerCase()==='gain/loss ($)');
-      if(gi>=0){let t=0,n=0;
+      if(gi>=0){let t=0,n=0,gp=0,gn=0;
         for(const l of L.slice(hi+1)){const c=splitLine(l).map(x=>x.replace(/^"|"$/g,''));
-          const v=num(c[gi]);if(c[0]&&v!=null){t+=v;n++}}
-        if(n)return {kind:'realized',total:t,source:'Schwab realized gain/loss'};}}}
+          const v=num(c[gi]);if(c[0]&&v!=null){t+=v;n++;if(v>0)gp+=v;else gn+=v}}
+        if(n)return {kind:'realized',total:t,gains:gp,losses:gn,source:'Schwab realized gain/loss'};}}}
   if(/Record Type/.test(L[0]||'')&&/Date Sold/.test(L[0]||'')){ // E*TRADE Gains & Losses
     const h=splitLine(L[0]).map(x=>x.trim());
     const gi=h.findIndex(x=>/adjusted gain\/loss$/i.test(x)||(/adjusted gain/i.test(x)&&!/per share/i.test(x)));
-    if(gi>=0){let t=0,n=0;
+    if(gi>=0){let t=0,n=0,gp=0,gn=0;
       for(const l of L.slice(1)){const c=splitLine(l);
-        if(c[0]!=='Sell')continue;const v=num(c[gi]);if(v!=null){t+=v;n++}}
-      if(n)return {kind:'realized',total:t,source:'E*TRADE gains & losses'};}}
+        if(c[0]!=='Sell')continue;const v=num(c[gi]);if(v!=null){t+=v;n++;if(v>0)gp+=v;else gn+=v}}
+      if(n)return {kind:'realized',total:t,gains:gp,losses:gn,source:'E*TRADE gains & losses'};}}
   // E*TRADE standard gains & losses download (not the expanded one)
   if(/Cost\/Share/i.test(L[0]||'')&&/Proceeds/i.test(L[0]||'')&&/Lot Selection/i.test(L[0]||'')){
     const h=splitLine(L[0]).map(x=>x.trim());
     const gi=h.findIndex(x=>/^gain/i.test(x));
     const di=h.findIndex(x=>/^deferred loss/i.test(x));
     if(gi>=0){
-      let t=0,n=0,def=0;
+      let t=0,n=0,def=0,gp=0,gn=0;
       for(const l of L.slice(1)){
         const c=splitLine(l).map(x=>x.trim());
         if(!c[0])continue;
         const v=num(c[gi]); if(v==null)continue;
-        t+=v; n++;
+        t+=v; n++; if(v>0)gp+=v; else gn+=v;
         if(di>=0){const d=num(c[di]); if(d)def+=d;}
       }
-      return {kind:'realized',total:t,source:'E*TRADE gains & losses'+(def?' (includes '+fmt(def)+' of deferred wash sale losses, check with your accountant)':'')};
+      return {kind:'realized',total:t,gains:gp,losses:gn,source:'E*TRADE gains & losses'+(def?' (includes '+fmt(def)+' of deferred wash sale losses, check with your accountant)':'')};
     }
   }
   // SoFi, one header for both exports; SELL rows mean it's a realized file
@@ -276,9 +286,9 @@ function detect(text){
     const body=L.slice(1).map(l=>splitLine(l).map(x=>x.trim())).filter(c=>c[bs]);
     const sells=body.filter(c=>/sell/i.test(c[bs]));
     if(sells.length){
-      let t=0;
-      sells.forEach(c=>{t+=(num(c[st])||0)+(num(c[lt])||0)});
-      return {kind:'realized',total:t,source:'SoFi realized gains'};
+      let t=0,gp=0,gn=0;
+      sells.forEach(c=>{const v=(num(c[st])||0)+(num(c[lt])||0);t+=v;if(v>0)gp+=v;else gn+=v});
+      return {kind:'realized',total:t,gains:gp,losses:gn,source:'SoFi realized gains'};
     }
     const bySym={};
     body.filter(c=>/buy/i.test(c[bs])).forEach(c=>{
@@ -306,11 +316,11 @@ function detect(text){
     if(hi>=0){const h=splitLine(L[hi]).map(x=>x.trim());
       const gi=h.findIndex(x=>/^total capital gain\/loss$/i.test(x));
       const isDetail=h.some(x=>/^date sold$/i.test(x));
-      if(gi>=0){let t=0,n=0;
+      if(gi>=0){let t=0,n=0,gp=0,gn=0;
         for(const l of L.slice(hi+1)){const c=splitLine(l).map(x=>x.trim());
           if(!c[0]||/^total/i.test(c[0]))continue;
-          const v=num(c[gi]);if(v!=null){t+=v;n++}}
-        return {kind:'realized',total:t,source:'Vanguard realized gains ('+(isDetail?'detail':'summary')+')'};}}}
+          const v=num(c[gi]);if(v!=null){t+=v;n++;if(v>0)gp+=v;else gn+=v}}
+        return {kind:'realized',total:t,gains:gp,losses:gn,source:'Vanguard realized gains ('+(isDetail?'detail':'summary')+')'};}}}
   // Vanguard unrealized cost basis, one row per LOT, with acquired date and ST/LT split
   if(/Symbol\/CUSIP/i.test(text)&&/Cost per share/i.test(text)&&/Acquired date/i.test(text)){
     const hi=L.findIndex(l=>/Symbol\/CUSIP/i.test(l)&&/Cost per share/i.test(l));
@@ -523,6 +533,11 @@ function render(){
   $('#fed').value=String(S.fed);
   $('#state').innerHTML=STATES.map(s=>`<option value="${s[0]}" ${S.state===s[0]?'selected':''}>${s[1]}${s[2]!=null&&s[0]?' ~'+s[2]+'%':''}</option>`).join('');
   $('#srate').value=S.stateRate!=null?S.stateRate:'';
+  const RS=realizedSplit();
+  const gs=document.getElementById('gainsplit');
+  const room=Math.max(-(S.ytd||0),0);
+  if(gs)gs.innerHTML=(RS.any?`${fmt(RS.gains)} in gains and ${fmt(Math.abs(RS.losses))} in losses so far this year, ${(S.ytd||0)<0?'so nothing is left to offset':'leaving '+fmt(S.ytd||0)+' to offset'}. `:'')
+    +(room>0?`Your losses exceed your gains by ${fmt(room)}. Sell up to that much in gains this year and they cancel out, or leave it and the losses carry forward instead.`:'');
   $('#combo').textContent=`Combined rate used in estimates: ${(S.rate*100).toFixed(1)}% (federal ${(S.fed*100).toFixed(1)}% + state ${(S.stateRate||0).toFixed(1)}%)`;
   if(!S.accounts.length){
     $('#stats').innerHTML='';
@@ -533,7 +548,12 @@ function render(){
     $('#ytd').value=S.ytd||'';$('#fed').value=String(S.fed);
     $('#state').innerHTML=STATES.map(s=>`<option value="${s[0]}" ${S.state===s[0]?'selected':''}>${s[1]}${s[2]!=null&&s[0]?' ~'+s[2]+'%':''}</option>`).join('');
     $('#srate').value=S.stateRate!=null?S.stateRate:'';
-    $('#combo').textContent=`Combined rate used in estimates: ${(S.rate*100).toFixed(1)}% (federal ${(S.fed*100).toFixed(1)}% + state ${(S.stateRate||0).toFixed(1)}%)`;
+    const RS=realizedSplit();
+  const gs=document.getElementById('gainsplit');
+  const room=Math.max(-(S.ytd||0),0);
+  if(gs)gs.innerHTML=(RS.any?`${fmt(RS.gains)} in gains and ${fmt(Math.abs(RS.losses))} in losses so far this year, ${(S.ytd||0)<0?'so nothing is left to offset':'leaving '+fmt(S.ytd||0)+' to offset'}. `:'')
+    +(room>0?`Your losses exceed your gains by ${fmt(room)}. Sell up to that much in gains this year and they cancel out, or leave it and the losses carry forward instead.`:'');
+  $('#combo').textContent=`Combined rate used in estimates: ${(S.rate*100).toFixed(1)}% (federal ${(S.fed*100).toFixed(1)}% + state ${(S.stateRate||0).toFixed(1)}%)`;
     return;
   }
   const A=analyze();
@@ -548,6 +568,7 @@ function render(){
     const v=k=>k==='symbol'||k==='acct'?String(x[k]).localeCompare(String(y[k])):x[k]-y[k];
     return v(sortCol)*sortDir||x.gl-y.gl;});
   const P=planImpact();
+  const RSP=realizedSplit();
   let planHtml='';
   if(P.cnt>0){
     const losses=Math.min(P.total,0);
@@ -556,8 +577,9 @@ function render(){
       const offset=T.offset,ordinary=T.ordinary,carry=T.carry,saved=T.saved;
       planHtml=`<div class="plan"><h3>Your sale plan, ${P.cnt} lot${P.cnt>1?'s':''} selected</h3>
        <div class="rowline"><span>Losses you'd realize<span class="tip" tabindex="0" data-tip="Realize means actually sell. Until you sell, a loss is only on paper and doesn’t count for taxes.">ⓘ</span></span><span class="num loss">${fmtP(P.total)}${(P.st<0||P.lt<0)?` <span class="hint" style="display:inline">(ST ${fmtP(Math.min(P.st,0))} / LT ${fmtP(Math.min(P.lt,0))}${P.unk<0?' / term unknown '+fmtP(P.unk):''})</span>`:''}</span></div>
-       <div class="rowline"><span>Offsets your realized gains</span><span class="num">${T.gains>0?fmt(offset)+' of '+fmt(T.gains):'no gains left this year'}</span></div>
+       <div class="rowline"><span>Offsets your realized gains${T.gains<=0&&RSP.any?`<span class="hint" style="display:block;margin:2px 0 0">You realized ${fmt(RSP.gains)} in gains and ${fmt(Math.abs(RSP.losses))} in losses this year, so the gains are already covered.</span>`:''}</span><span class="num">${T.gains>0?fmt(offset)+' of '+fmt(T.gains):'none left'}</span></div>
        <div class="rowline"><span>Deducts against ordinary income<span class="tip" tabindex="0" data-tip="Ordinary income is your regular income, like wages, salary and interest. After losses cancel your gains, up to $3,000 of leftover losses can reduce this too, each year.">ⓘ</span></span><span class="num">${fmt(ordinary)}</span></div>
+       <div class="rowline"><span>Room to sell gains without tax<span class="tip" tabindex="0" data-tip="Losses and gains net against each other for the year, so selling winners up to this amount cancels out. Using it is optional. Anything you leave unused carries forward with no expiry. The 30 day wash sale rule restricts rebuying something you sold at a loss, not selling a winner, so you may buy something different the same day. Losses offset the same type first, so check the ordering with your accountant.">&#9432;</span></span><span class="num gain">${fmt(Math.max(-((S.ytd||0)+P.total),0))}</span></div>
        <div class="rowline"><span>Carries forward to future years<span class="tip" tabindex="0" data-tip="Unused losses never expire. They roll into next year automatically, offsetting future gains, plus another $3,000 of regular income every year until used up.">ⓘ</span></span><span class="num">${fmt(carry)}</span></div>
        <div class="rowline"><span><b>Estimated tax savings</b></span><span class="num gain big-save">≈ ${fmt(saved)}</span></div>
        ${P.locked>0?`<p class="hint" style="color:#7a5c00;background:#fdf3ce;padding:9px 12px;border-radius:8px;margin-top:12px">⚠️ ${P.locked} selected ESPP lot${P.locked>1?'s have':' has'} not reached the qualifying date. Selling now triggers ordinary income on the purchase discount, even at a loss. First one clears ${fmtD(P.lockedEarliest)}. Consider unchecking until then.</p>`:''}
@@ -620,6 +642,7 @@ function render(){
    }).join('')}</tbody></table>
    <div style="margin-top:12px"><button class="pill ghost" onclick="exportLotsCsv(false)">Download all lots (CSV)</button></div>
    <div class="hint" style="margin-top:12px;line-height:1.7">
+    <b>Two ways to use extra losses:</b> sell winners this year up to the amount your losses exceed your gains, and the two cancel out. Or use none of it. Unused losses carry forward with no expiry, waiting for gains in a future year, plus $3,000 against regular income each year along the way. The wash sale rule restricts rebuying something you sold at a <em>loss</em>, so it doesn't stop you from selling a winner and buying something else the same day.<br>
     <b>Wash-sale rule:</b> don’t rebuy a sold security within 30 days before or after the sale. Automatic dividend reinvestment in any of your household’s accounts counts.<br>
     <b>Short vs long term:</b> needs per-lot purchase dates. Most positions files don’t have them, so use “+ lot detail.”
     ${S.accounts.some(x=>/ESPP/i.test(x.name))?'<br><b>ESPP rules:</b> selling within 2 years of the grant date can trigger ordinary income on the discount, even at a loss. Check each lot’s qualifying date first.':''}
@@ -630,7 +653,7 @@ function render(){
   if(A.noBasis.length)$('#report').insertAdjacentHTML('beforeend',`<p class="hint">⚠️ ${A.noBasis.length} positions imported without cost basis (${[...new Set(A.noBasis.map(r=>r.symbol))].slice(0,6).join(', ')}${A.noBasis.length>6?'…':''}) that can’t be analyzed. without cost basis there's nothing to compare against, so these can't be analyzed. Some brokerages leave it out of the standard holdings download. Vanguard is one: use its Cost basis → Unrealized gains/losses export instead, which includes both. For others, look for a cost basis export and drop it in; the column mapper will place the columns.</p>`);
   $('#acctSum').textContent=`${S.accounts.length} imported · ${fmt(S.accounts.reduce((s,x)=>s+x.rows.reduce((t,r)=>t+r.qty*(r.price||0),0),0))}`;
   const realizedRows=Object.entries(S.realized||{}).map(([k,v])=>`<div class="acct"><span>${k}<span class="tag">sales file</span></span>
-   <span><span class="num" style="color:var(--ink2)">${fmt(v)}</span>
+   <span><span class="num" style="color:var(--ink2)">${fmt(rTotal(v))}</span>
    <button class="x" onclick="rmRealized('${k.replace(/'/g,"\\'")}')" aria-label="Remove ${k}">✕</button></span></div>`).join('');
   $('#accts').innerHTML=realizedRows+S.accounts.map((a,i)=>`<div class="acct"><span>${a.name}<span class="tag">${a.rows.length} positions</span></span>
    <span><span class="num" style="color:var(--ink2)">${fmt(a.rows.reduce((s,r)=>s+r.qty*(r.price||0),0))}</span>
@@ -830,10 +853,12 @@ let sortCol='gl',sortDir=1;
 function kbSort(e,c){if(e.key==='Enter'||e.key===' '){e.preventDefault();setSort(c)}}
 function setSort(c){if(sortCol===c)sortDir*=-1;else{sortCol=c;sortDir=1}render()}
 let dlgOk=null;
-function openDlg(html,onOk,okLabel){const d=$('#dlg');dlgOk=onOk;
-  d.innerHTML=html+`<div class="d-actions"><button class="pill ghost" onclick="document.getElementById('dlg').close()">Cancel</button>
-  <button class="pill blue" id="ok">${okLabel||'Save'}</button></div>`;
-  d.querySelector('#ok').onclick=()=>{const r=dlgOk&&dlgOk();if(r!==undefined&&!r)return;d.close()};d.showModal();}
+function openDlg(html,onOk,okLabel,actions){const d=$('#dlg');dlgOk=onOk;
+  d.innerHTML=html+(actions||`<div class="d-actions"><button class="pill text" onclick="document.getElementById('dlg').close()">Cancel</button>
+  <button class="pill blue" id="ok">${okLabel||'Save'}</button></div>`);
+  const okBtn=d.querySelector('#ok');
+  if(okBtn)okBtn.onclick=()=>{const r=dlgOk&&dlgOk();if(r!==undefined&&!r)return;d.close()};
+  d.showModal();}
 render();
 </script>
 </body>
