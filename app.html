@@ -590,6 +590,18 @@ function render(){
        <div class="rowline"><span>Your selection nets a <b>gain</b>, not a loss</span><span class="num gain">+${fmt(P.total)}</span></div>
        <p class="hint">Selling these adds to your taxable gains. Uncheck gain lots, or pair them with more loss lots to offset.</p></div>`;
     }
+  } else {
+    const net=S.ytd||0;
+    const L=Math.max(-net,0);
+    const ordinary=Math.min(3000,L);
+    const carry=L-ordinary;
+    planHtml=`<div class="plan"><h3>Where you stand this year</h3>
+     <div class="rowline"><span>Sales so far, gains minus losses</span><span class="num ${net<0?'loss':'gain'}">${net<0?fmtP(net):fmt(net)}</span></div>
+     ${L>0?`<div class="rowline"><span>Room to sell gains without tax<span class="tip" tabindex="0" data-tip="Losses and gains net against each other for the year, so selling winners up to this amount cancels out. Using it is optional. Anything you leave unused carries forward with no expiry.">&#9432;</span></span><span class="num gain">${fmt(L)}</span></div>
+     <div class="rowline"><span>Against ordinary income</span><span class="num">${fmt(ordinary)}</span></div>
+     <div class="rowline"><span>Carries forward if you stop here</span><span class="num">${fmt(carry)}</span></div>`
+     :`<div class="rowline"><span>Gains still waiting to be offset</span><span class="num">${fmt(net)}</span></div>`}
+     <p class="hint" style="margin-top:10px">Check lots below to see what harvesting would add.</p></div>`;
   }
   const lotRows=r=>{
     const exp=expandedRows.has(r.acct+'|'+r.symbol);
