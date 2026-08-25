@@ -148,7 +148,7 @@ details.card summary .hint{font-weight:400;margin-left:8px}
 </div>
 <div class="foot wrap">Your data lives only in this browser, so clearing your site data erases it.<br>
 Educational tool for US tax rules · Not investment or tax advice · No accounts, no tracking, no server · <a href="index.html" style="color:var(--ink2)">About</a><br>
-<span style="display:inline-block;margin-top:10px">&copy; 2026 Gleaner app · <a href="https://github.com/tyuan8/gleaner-tool" style="color:inherit">Read the code</a></span></div>
+<span style="display:inline-block;margin-top:10px">&copy; 2026 Gleaner app · <a href="https://github.com/tyuan8/gleanerapp" style="color:inherit" target="_blank" rel="noopener">Read the code</a></span></div>
 <dialog id="dlg"></dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <input type="file" id="file" accept=".csv" multiple hidden>
@@ -218,6 +218,23 @@ function detect(text){
       for(const l of L.slice(1)){const c=splitLine(l);
         if(c[0]!=='Sell')continue;const v=num(c[gi]);if(v!=null){t+=v;n++}}
       if(n)return {kind:'realized',total:t,source:'E*TRADE gains & losses'};}}
+  // E*TRADE standard gains & losses download (not the expanded one)
+  if(/Cost\/Share/i.test(L[0]||'')&&/Proceeds/i.test(L[0]||'')&&/Lot Selection/i.test(L[0]||'')){
+    const h=splitLine(L[0]).map(x=>x.trim());
+    const gi=h.findIndex(x=>/^gain/i.test(x));
+    const di=h.findIndex(x=>/^deferred loss/i.test(x));
+    if(gi>=0){
+      let t=0,n=0,def=0;
+      for(const l of L.slice(1)){
+        const c=splitLine(l).map(x=>x.trim());
+        if(!c[0])continue;
+        const v=num(c[gi]); if(v==null)continue;
+        t+=v; n++;
+        if(di>=0){const d=num(c[di]); if(d)def+=d;}
+      }
+      return {kind:'realized',total:t,source:'E*TRADE gains & losses'+(def?' (includes '+fmt(def)+' of deferred wash sale losses, check with your accountant)':'')};
+    }
+  }
   // SoFi, one header for both exports; SELL rows mean it's a realized file
   if(/Buy\/Sell/i.test(L[0]||'')&&/Disallowed Loss/i.test(L[0]||'')){
     const h=splitLine(L[0]).map(x=>x.trim());
@@ -710,7 +727,7 @@ function whichFile(){
     <tr><td class="sym">Vanguard</td><td>Cost basis → Realized gains/losses → download (summary or detail)</td><td class="num">②</td></tr>
     <tr><td class="sym">SoFi</td><td>Investing → Documents → cost basis export. The unrealized one covers holdings and lots, the realized one fills your gains.</td><td class="num">① + ③, and ②</td></tr>
     <tr><td class="sym">E*TRADE employee stock plan (RSU / ESPP)</td><td>At Work → Holdings → Download</td><td class="num">① + ③</td></tr>
-    <tr><td class="sym">E*TRADE employee stock plan (RSU / ESPP)</td><td>At Work → Gains & Losses → Download Expanded</td></tr>
+    <tr><td class="sym">E*TRADE employee stock plan (RSU / ESPP)</td><td>At Work → Gains and Losses → Download. Standard or expanded, either one works.</td></tr>
     <tr><td class="sym">J.P. Morgan</td><td>Positions → tax lots view → download</td><td class="num">① + ③</td></tr>
    </tbody></table>
    <p class="hint" style="margin-top:12px"><b>Don't worry about what the file is called.</b> Gleaner identifies files by what's inside, not their names. Drop anything in and it sorts positions from realized gains from lot detail automatically. If it truly can't tell, the column mapper asks you.</p>
