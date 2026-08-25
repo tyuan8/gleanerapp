@@ -128,7 +128,7 @@ details.card summary .hint{font-weight:400;margin-left:8px}
   <h2>Harvest report</h2>
   <p class="sub" style="font-size:.9rem">Positions currently worth less than you paid, ranked by loss. Selling realizes the loss for your tax return.</p>
   <div class="row" style="margin:14px 0 6px;max-width:860px">
-   <div><label>Gains you've already realized this year ($)<span class="tip" tabindex="0" data-tip="Realized means you actually sold. Profits still sitting in investments don’t count yet. Type your total here, or drop your brokerage's realized gain/loss CSV onto the page and this fills itself. E*TRADE and Schwab formats are read automatically.">ⓘ</span></label><input id="ytd" type="number" placeholder="0" onchange="S.ytd=+this.value||0;save()"></div>
+   <div><label>Gains you've already realized this year ($)<span class="tip" tabindex="0" data-tip="Enter a negative number if your sales so far add up to a net loss. Realized means you actually sold. Profits still sitting in investments don’t count yet. Type your total here, or drop your brokerage's realized gain/loss CSV onto the page and this fills itself. E*TRADE and Schwab formats are read automatically.">ⓘ</span></label><input id="ytd" type="number" placeholder="0" onchange="S.ytd=+this.value||0;save()"></div>
    <div><label>Federal rate on long-term gains<span class="tip" tabindex="0" data-tip="Not your income tax bracket. Long term capital gains (held over a year) have their own lower schedule: 0%, 15%, or 20% depending on household income, plus an extra 3.8% on investment income once household income passes ~$250K married or ~$200K single. The IRS calls that the net investment income tax, or NIIT. Pick the tier matching your total household income.">ⓘ</span></label><select id="fed" onchange="S.fed=+this.value;recalcRate()">
     <option value="0">0% for income under ~$97K married or ~$48K single</option>
     <option value="0.15">15% for income up to ~$250K</option>
@@ -179,12 +179,43 @@ async function handleFile(f){
   const parsed=detect(text);
   if(parsed&&parsed.kind==='realized'){
     S.realized=S.realized||{};
-    const prev=S.realized[f.name]||0;
-    S.ytd=Math.round(((S.ytd||0)-prev+parsed.total)*100)/100;
-    S.realized[f.name]=parsed.total;S.demo=false;save();
-    toast(`${parsed.source}: ${fmt(parsed.total)} realized, added to the gains field`);return}
+    const others=Object.keys(S.realized).filter(k=>k!==f.name);
+    if(others.length){
+      pendingRealized={name:f.name,total:parsed.total,source:parsed.source};
+      openDlg(`<h2 style="font-size:1.3rem">You already imported a sales file</h2>
+       <p class="hint" style="margin-top:8px">Gleaner is holding ${fmt(Object.values(S.realized).reduce((s,v)=>s+v,0))} in realized gains from:</p>
+       <ul style="font-size:.85rem;color:var(--ink2);margin:8px 0 0 20px">${others.map(k=>`<li>${k} (${fmt(S.realized[k])})</li>`).join('')}</ul>
+       <p class="hint" style="margin-top:12px"><b>${f.name}</b> adds ${fmt(parsed.total)}.</p>
+       <p class="hint" style="margin-top:8px">Add it only if it covers different sales. An account level file usually already includes your stock plan sales, so importing both counts them twice.</p>
+       <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="pill" onclick="applyRealized('replace')">Replace what's there</button>
+        <button class="pill ghost" onclick="applyRealized('add')">Add to it</button>
+       </div>`,()=>{},'Cancel');
+      return;
+    }
+    applyRealizedNow(f.name,parsed.total,parsed.source);return}
   if(parsed){finishImport(parsed.name,parsed.rows,f.name)}
   else openMapper(text,f.name);
+}
+let pendingRealized=null;
+function applyRealizedNow(name,total,source){
+  S.realized=S.realized||{};
+  const prev=S.realized[name]||0;
+  S.ytd=Math.round(((S.ytd||0)-prev+total)*100)/100;
+  S.realized[name]=total;S.demo=false;save();
+  toast(`${source}: ${fmt(total)} realized, added to the gains field`);
+}
+function applyRealized(mode){
+  const p=pendingRealized; if(!p)return;
+  document.getElementById('dlg').close();
+  if(mode==='replace'){S.realized={};S.ytd=0;}
+  applyRealizedNow(p.name,p.total,p.source);
+  pendingRealized=null;
+}
+function rmRealized(name){
+  const v=S.realized[name]||0;
+  S.ytd=Math.round(((S.ytd||0)-v)*100)/100;
+  delete S.realized[name];save();toast('Removed '+name);
 }
 function finishImport(brokerName,rows,fname){
   rows=rows.filter(r=>r.symbol&&r.qty>0);
@@ -449,6 +480,18 @@ function openMapper(text,fname){
     finishImport('Custom',rows,fname);},'Import');
 }
 /* ---------- harvest engine ---------- */
+function taxImpact(lossAmt){
+  // lossAmt is negative. S.ytd may be positive (gains) or negative (net losses already realized).
+  const L=Math.abs(lossAmt);
+  const gains=Math.max(S.ytd||0,0);
+  const priorLoss=Math.max(-(S.ytd||0),0);          // losses already booked this year
+  const offset=Math.min(L,gains);                    // cancels gains dollar for dollar
+  const ordinaryRoom=Math.max(3000-Math.max(priorLoss-gains,0),0); // $3,000 may already be used up
+  const ordinary=Math.min(ordinaryRoom,L-offset);
+  const carry=L-offset-ordinary;
+  const saved=offset*S.rate+ordinary*(S.rate+0.10);
+  return {offset,ordinary,carry,saved,gains,priorLoss};
+}
 function allRows(){return S.accounts.flatMap(a=>a.rows.map(r=>({...r,acct:a.name})))}
 function analyze(){
   const rows=allRows();
@@ -494,13 +537,12 @@ function render(){
     return;
   }
   const A=analyze();
-  const offset=Math.min(Math.abs(A.totalLoss),S.ytd||0);
-  const surplus=Math.abs(A.totalLoss)-offset;
-  const saved=offset*S.rate+Math.min(surplus,3000)*(S.rate+0.10);
+  const T=taxImpact(A.totalLoss);
+  const offset=T.offset,surplus=Math.abs(A.totalLoss)-offset,saved=T.saved;
   $('#stats').innerHTML=`
    <div class="stat"><div class="l">Portfolio imported</div><div class="v num">${fmt(A.totalVal)}</div><div class="hint">${A.count} positions · ${S.accounts.length} account${S.accounts.length>1?'s':''}</div></div>
    <div class="stat"><div class="l">Harvestable losses<span class="tip" tabindex="0" data-tip="Positions currently worth less than you paid. The loss is only on paper until you sell. Selling turns it into a tax deduction, and that’s the harvest.">ⓘ</span></div><div class="v num loss">${fmtP(A.totalLoss)}</div><div class="hint">${A.losers.length} underwater positions</div></div>
-   <div class="stat"><div class="l">Estimated tax savings if harvested</div><div class="v num gain">≈ ${fmt(saved)}</div><div class="hint">offsets ${fmt(offset)} of gains${surplus>0?' + '+fmt(Math.min(surplus,3000))+' vs income; '+fmt(Math.max(surplus-3000,0))+' carries forward':''}</div></div>`;
+   <div class="stat"><div class="l">Estimated tax savings if harvested</div><div class="v num gain">≈ ${fmt(saved)}</div><div class="hint">${T.gains>0?`offsets ${fmt(T.offset)} of gains. `:'You have no gains left to offset this year. '}${T.ordinary>0?`${fmt(T.ordinary)} comes off ordinary income. `:''}${T.carry>0?`${fmt(T.carry)} carries forward.`:''}</div></div>`;
   const arrow=c=>sortCol===c?(sortDir===1?' ▲':' ▼'):'';
   const sorted=[...A.losers].sort((x,y)=>{
     const v=k=>k==='symbol'||k==='acct'?String(x[k]).localeCompare(String(y[k])):x[k]-y[k];
@@ -510,13 +552,11 @@ function render(){
   if(P.cnt>0){
     const losses=Math.min(P.total,0);
     if(P.total<0){
-      const offset=Math.min(Math.abs(P.total),S.ytd||0);
-      const ordinary=Math.min(3000,Math.abs(P.total)-offset);
-      const carry=Math.abs(P.total)-offset-ordinary;
-      const saved=offset*S.rate+ordinary*(S.rate+0.10);
+      const T=taxImpact(P.total);
+      const offset=T.offset,ordinary=T.ordinary,carry=T.carry,saved=T.saved;
       planHtml=`<div class="plan"><h3>Your sale plan, ${P.cnt} lot${P.cnt>1?'s':''} selected</h3>
        <div class="rowline"><span>Losses you'd realize<span class="tip" tabindex="0" data-tip="Realize means actually sell. Until you sell, a loss is only on paper and doesn’t count for taxes.">ⓘ</span></span><span class="num loss">${fmtP(P.total)}${(P.st<0||P.lt<0)?` <span class="hint" style="display:inline">(ST ${fmtP(Math.min(P.st,0))} / LT ${fmtP(Math.min(P.lt,0))}${P.unk<0?' / term unknown '+fmtP(P.unk):''})</span>`:''}</span></div>
-       <div class="rowline"><span>Offsets your realized gains</span><span class="num">${fmt(offset)} of ${fmt(S.ytd||0)}</span></div>
+       <div class="rowline"><span>Offsets your realized gains</span><span class="num">${T.gains>0?fmt(offset)+' of '+fmt(T.gains):'no gains left this year'}</span></div>
        <div class="rowline"><span>Deducts against ordinary income<span class="tip" tabindex="0" data-tip="Ordinary income is your regular income, like wages, salary and interest. After losses cancel your gains, up to $3,000 of leftover losses can reduce this too, each year.">ⓘ</span></span><span class="num">${fmt(ordinary)}</span></div>
        <div class="rowline"><span>Carries forward to future years<span class="tip" tabindex="0" data-tip="Unused losses never expire. They roll into next year automatically, offsetting future gains, plus another $3,000 of regular income every year until used up.">ⓘ</span></span><span class="num">${fmt(carry)}</span></div>
        <div class="rowline"><span><b>Estimated tax savings</b></span><span class="num gain big-save">≈ ${fmt(saved)}</span></div>
@@ -589,7 +629,10 @@ function render(){
   document.querySelectorAll('.tip[data-tip]').forEach(t=>{if(!t.getAttribute('aria-label'))t.setAttribute('aria-label',t.dataset.tip)});
   if(A.noBasis.length)$('#report').insertAdjacentHTML('beforeend',`<p class="hint">⚠️ ${A.noBasis.length} positions imported without cost basis (${[...new Set(A.noBasis.map(r=>r.symbol))].slice(0,6).join(', ')}${A.noBasis.length>6?'…':''}) that can’t be analyzed. without cost basis there's nothing to compare against, so these can't be analyzed. Some brokerages leave it out of the standard holdings download. Vanguard is one: use its Cost basis → Unrealized gains/losses export instead, which includes both. For others, look for a cost basis export and drop it in; the column mapper will place the columns.</p>`);
   $('#acctSum').textContent=`${S.accounts.length} imported · ${fmt(S.accounts.reduce((s,x)=>s+x.rows.reduce((t,r)=>t+r.qty*(r.price||0),0),0))}`;
-  $('#accts').innerHTML=S.accounts.map((a,i)=>`<div class="acct"><span>${a.name}<span class="tag">${a.rows.length} positions</span></span>
+  const realizedRows=Object.entries(S.realized||{}).map(([k,v])=>`<div class="acct"><span>${k}<span class="tag">sales file</span></span>
+   <span><span class="num" style="color:var(--ink2)">${fmt(v)}</span>
+   <button class="x" onclick="rmRealized('${k.replace(/'/g,"\\'")}')" aria-label="Remove ${k}">✕</button></span></div>`).join('');
+  $('#accts').innerHTML=realizedRows+S.accounts.map((a,i)=>`<div class="acct"><span>${a.name}<span class="tag">${a.rows.length} positions</span></span>
    <span><span class="num" style="color:var(--ink2)">${fmt(a.rows.reduce((s,r)=>s+r.qty*(r.price||0),0))}</span>
    <button class="x" onclick="rmAcct(${i})" aria-label="Remove ${a.name}">✕</button></span></div>`).join('');
 }
@@ -609,10 +652,8 @@ function exportReport(){
   out.push(line(['Total harvestable losses',A.totalLoss.toFixed(2)]));
   const P=planImpact();
   if(P.cnt>0&&P.total<0){
-    const offset=Math.min(Math.abs(P.total),S.ytd||0);
-    const ordinary=Math.min(3000,Math.abs(P.total)-offset);
-    const carry=Math.abs(P.total)-offset-ordinary;
-    const saved=offset*S.rate+ordinary*(S.rate+0.10);
+    const T=taxImpact(P.total);
+    const offset=T.offset,ordinary=T.ordinary,carry=T.carry,saved=T.saved;
     out.push('');
     out.push(line(['SALE PLAN','']));
     out.push(line(['Lots selected',P.cnt]));
